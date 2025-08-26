@@ -30,15 +30,16 @@ def ask_gemini_api(data_to_analyze):
     prompt = f"""
     Aşağıdaki meteorolojik verileri analiz et ve bir cümlelik kısa bir yorum yap. 
     Verilen tüm indeksleri (CAPE, CIN, LI, vb.) ve değerleri dikkate al. 
+    Veriler 'nan' ise, o veri için yorum yapma.
     Meteorolojik bilgi düzeyi yüksek, fakat herkesin anlayabileceği şekilde, teknik terimlerden kaçınarak bir özet yaz.
     
     Veriler:
-    - Yüzey CAPE: {data_to_analyze['cape']:.2f} J/kg
-    - Yüzey CIN: {data_to_analyze['cin']:.2f} J/kg
-    - En Kararsız Parsel (MU-CAPE): {data_to_analyze['mu_cape']:.2f} J/kg
-    - Karışık Katman Parseli (ML-CAPE): {data_to_analyze['ml_cape']:.2f} J/kg
-    - LI (Yükselme İndeksi): {data_to_analyze['li']:.2f} Δ°C
-    - K-İndeksi: {data_to_analyze['k_index']:.2f} °C
+    - Yüzey CAPE: {data_to_analyze['cape']:.2f if not np.isnan(data_to_analyze['cape']) else 'Veri Yok'} J/kg
+    - Yüzey CIN: {data_to_analyze['cin']:.2f if not np.isnan(data_to_analyze['cin']) else 'Veri Yok'} J/kg
+    - En Kararsız Parsel (MU-CAPE): {data_to_analyze['mu_cape']:.2f if not np.isnan(data_to_analyze['mu_cape']) else 'Veri Yok'} J/kg
+    - Karışık Katman Parseli (ML-CAPE): {data_to_analyze['ml_cape']:.2f if not np.isnan(data_to_analyze['ml_cape']) else 'Veri Yok'} J/kg
+    - LI (Yükselme İndeksi): {data_to_analyze['li']:.2f if not np.isnan(data_to_analyze['li']) else 'Veri Yok'} Δ°C
+    - K-İndeksi: {data_to_analyze['k_index']:.2f if not np.isnan(data_to_analyze['k_index']) else 'Veri Yok'} °C
     """
     
     payload = {
@@ -242,7 +243,10 @@ if st.button("Analiz Et"):
         
         st.subheader("Konvektif Seviyeler ve İndeksler")
         st.write(f"**Serbest Konveksiyon Seviyesi (LFC) Basıncı:** {lfc_p.to('hPa'):.2f~P}")
-        st.write(f"**Denge Seviyesi (EL) Basıncı:** {el_p.to('hPa'):.2f~P}")
+        if el_p is not None:
+             st.write(f"**Denge Seviyesi (EL) Basıncı:** {el_p.to('hPa'):.2f~P}")
+        else:
+             st.write(f"**Denge Seviyesi (EL) Basıncı:** Yok")
         st.write(f"**Yüzeyden Yükselen Parsel için CAPE:** {cape:.2f~P}")
         st.write(f"**Yüzeyden Yükselen Parsel için CIN:** {cin:.2f~P}")
         st.write(f"**En Kararsız Parsel (MU-CAPE):** {mu_cape:.2f~P}")
@@ -260,8 +264,8 @@ if st.button("Analiz Et"):
             'cin': cin.to('J/kg').magnitude,
             'mu_cape': mu_cape.to('J/kg').magnitude,
             'ml_cape': ml_cape.to('J/kg').magnitude,
-            'li': li.magnitude if li is not None and np.isfinite(li.magnitude) else -999.0,
-            'k_index': k_index_val.magnitude if k_index_val is not None and np.isfinite(k_index_val.magnitude) else -999.0,
+            'li': li.magnitude if li is not None and np.isfinite(li.magnitude) else np.nan,
+            'k_index': k_index_val.magnitude if k_index_val is not None and np.isfinite(k_index_val.magnitude) else np.nan,
         }
         
         with st.spinner('Yapay zeka analiz yapıyor, lütfen bekleyin...'):
@@ -293,8 +297,9 @@ if st.button("Analiz Et"):
         skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', markersize=8)
         skew.ax.text(lcl_t.magnitude + 2, lcl_p.magnitude, 'LCL', fontsize=11, color='black', ha='left', va='center')
         
-        skew.plot(lfc_p, lfc_t, 'ro', markerfacecolor='red', markersize=8)
-        skew.ax.text(lfc_t.magnitude + 2, lfc_p.magnitude, 'LFC', fontsize=11, color='red', ha='left', va='center')
+        if lfc_p is not None and lfc_t is not None:
+            skew.plot(lfc_p, lfc_t, 'ro', markerfacecolor='red', markersize=8)
+            skew.ax.text(lfc_t.magnitude + 2, lfc_p.magnitude, 'LFC', fontsize=11, color='red', ha='left', va='center')
         
         if el_p is not None and el_t is not None:
             skew.plot(el_p, el_t, 'bo', markerfacecolor='blue', markersize=8)

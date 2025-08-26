@@ -40,8 +40,8 @@ def generate_meteorological_comment(analysis_data):
             commentary.append("- **Durum:** Çok Düşük Potansiyel Enerji 🌬️")
             commentary.append("- **Anlamı:** Atmosfer kararlıdır, ciddi bir konveksiyon (fırtına) oluşumu için yeterli enerji yoktur. Hava genellikle sakindir.")
     else:
-        commentary.append("### Konvektif Potansiyel Enerji (CAPE): `Veri Yok`")
-        commentary.append("- **Anlamı:** Atmosferik kararsızlık hakkında kesin bir yorum yapılamamaktadır.")
+        commentary.append("### Konvektif Potansiyel Enerji (CAPE): `Hesaplanamıyor / Yok`")
+        commentary.append("- **Anlamı:** Atmosferik kararsızlık hakkında kesin bir yorum yapılamamaktadır. Yükselen parsel atmosferik profile göre daha soğuk olduğu için bir CAPE alanı oluşmamış olabilir.")
     
     commentary.append("\n---")
 
@@ -58,8 +58,8 @@ def generate_meteorological_comment(analysis_data):
             commentary.append("- **Durum:** Çok Güçlü Bastırıcı Katman 🚫")
             commentary.append("- **Anlamı:** Atmosferde konveksiyonu (dikey hava hareketini) ciddi şekilde engelleyen çok güçlü bir katman bulunmaktadır. Bu koşullar altında fırtına oluşumu çok zordur.")
     else:
-        commentary.append("### Konvektif Engelleme (CIN): `Veri Yok`")
-        commentary.append("- **Anlamı:** Bastırıcı katman hakkında kesin bir yorum yapılamamaktadır.")
+        commentary.append("### Konvektif Engelleme (CIN): `Hesaplanamıyor / Yok`")
+        commentary.append("- **Anlamı:** Bastırıcı katman hakkında kesin bir yorum yapılamamaktadır. Yükselen parsel atmosferik profile göre daha soğuk olduğu için bir CIN alanı oluşmamış olabilir.")
 
     commentary.append("\n---")
     
@@ -265,52 +265,61 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             
             parcel_temp_profile = parcel_profile(p_profile, t_start, td_start)
             
+            cape, cin = np.nan * units.J/units.kg, np.nan * units.J/units.kg
+            mu_cape, mu_cin = np.nan * units.J/units.kg, np.nan * units.J/units.kg
+            ml_cape, ml_cin = np.nan * units.J/units.kg, np.nan * units.J/units.kg
+            li = np.nan * units.degC
+            k_index_val = np.nan * units.degC
+            lcl_p, lcl_t = None, None
+            lfc_p, lfc_t = None, None
+            el_p, el_t = None, None
+
             try:
                 cape, cin = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-                if cape.size == 0: cape = np.array([np.nan]) * units.J/units.kg
-                if cin.size == 0: cin = np.array([np.nan]) * units.J/units.kg
-            except Exception:
-                cape, cin = np.array([np.nan]) * units.J/units.kg, np.array([np.nan]) * units.J/units.kg
+                if cape.size == 0: cape = np.nan * units.J/units.kg
+                if cin.size == 0: cin = np.nan * units.J/units.kg
+            except (ValueError, IndexError) as e:
+                st.warning(f"CAPE/CIN hesaplanırken bir hata oluştu: {e}")
 
             try:
                 mu_cape, mu_cin = most_unstable_cape_cin(p_profile, temp_profile, dewpoint_profile)
-                if mu_cape.size == 0: mu_cape = np.array([np.nan]) * units.J/units.kg
-                if mu_cin.size == 0: mu_cin = np.array([np.nan]) * units.J/units.kg
-            except Exception:
-                mu_cape, mu_cin = np.array([np.nan]) * units.J/units.kg, np.array([np.nan]) * units.J/units.kg
+                if mu_cape.size == 0: mu_cape = np.nan * units.J/units.kg
+                if mu_cin.size == 0: mu_cin = np.nan * units.J/units.kg
+            except (ValueError, IndexError) as e:
+                st.warning(f"MU-CAPE/CIN hesaplanırken bir hata oluştu: {e}")
 
             try:
                 ml_cape, ml_cin = mixed_layer_cape_cin(p_profile, temp_profile, dewpoint_profile)
-                if ml_cape.size == 0: ml_cape = np.array([np.nan]) * units.J/units.kg
-                if ml_cin.size == 0: ml_cin = np.array([np.nan]) * units.J/units.kg
-            except Exception:
-                ml_cape, ml_cin = np.array([np.nan]) * units.J/units.kg, np.array([np.nan]) * units.J/units.kg
+                if ml_cape.size == 0: ml_cape = np.nan * units.J/units.kg
+                if ml_cin.size == 0: ml_cin = np.nan * units.J/units.kg
+            except (ValueError, IndexError) as e:
+                st.warning(f"ML-CAPE/CIN hesaplanırken bir hata oluştu: {e}")
             
             try:
                 li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
-                if li.size == 0: li = np.array([np.nan]) * units.degC
-            except Exception:
-                li = np.array([np.nan]) * units.degC
-            
+                if li.size == 0: li = np.nan * units.degC
+            except (ValueError, IndexError) as e:
+                st.warning(f"LI hesaplanırken bir hata oluştu: {e}")
+
             try:
                 k_index_val = k_index(p_profile, temp_profile, dewpoint_profile)
-                if k_index_val.size == 0: k_index_val = np.array([np.nan]) * units.degC
-            except Exception:
-                k_index_val = np.array([np.nan]) * units.degC
+                if k_index_val.size == 0: k_index_val = np.nan * units.degC
+            except (ValueError, IndexError) as e:
+                st.warning(f"K-İndeksi hesaplanırken bir hata oluştu: {e}")
             
             try:
                 lcl_p, lcl_t = lcl(p_start, t_start, td_start)
-            except Exception:
+            except (ValueError, IndexError):
                 lcl_p, lcl_t = None, None
                 
             try:
                 lfc_p, lfc_t = lfc(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-            except Exception:
+            except (ValueError, IndexError):
                 lfc_p, lfc_t = None, None
                 
             try:
                 el_p, el_t = el(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-            except Exception:
+            except (ValueError, IndexError):
                 el_p, el_t = None, None
             
             st.success("Analiz tamamlandı!")
@@ -330,12 +339,12 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             index_data = {
                 "İndeks": ["CAPE", "CIN", "MU-CAPE", "ML-CAPE", "LI", "K-İndeksi"],
                 "Değer": [
-                    f"{get_value_for_commentary(cape.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(cape.to('J/kg'))) else "Yok",
-                    f"{get_value_for_commentary(cin.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(cin.to('J/kg'))) else "Yok",
-                    f"{get_value_for_commentary(mu_cape.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(mu_cape.to('J/kg'))) else "Yok",
-                    f"{get_value_for_commentary(ml_cape.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(ml_cape.to('J/kg'))) else "Yok",
-                    f"{get_value_for_commentary(li):.2f} °C" if not np.isnan(get_value_for_commentary(li)) else "Yok",
-                    f"{get_value_for_commentary(k_index_val):.2f} °C" if not np.isnan(get_value_for_commentary(k_index_val)) else "Yok",
+                    f"{get_value_for_commentary(cape.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(cape.to('J/kg'))) else "Hesaplanamadı",
+                    f"{get_value_for_commentary(cin.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(cin.to('J/kg'))) else "Hesaplanamadı",
+                    f"{get_value_for_commentary(mu_cape.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(mu_cape.to('J/kg'))) else "Hesaplanamadı",
+                    f"{get_value_for_commentary(ml_cape.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(ml_cape.to('J/kg'))) else "Hesaplanamadı",
+                    f"{get_value_for_commentary(li):.2f} °C" if not np.isnan(get_value_for_commentary(li)) else "Hesaplanamadı",
+                    f"{get_value_for_commentary(k_index_val):.2f} °C" if not np.isnan(get_value_for_commentary(k_index_val)) else "Hesaplanamadı",
                 ]
             }
             st.table(pd.DataFrame(index_data))
@@ -381,7 +390,6 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
                 skew.shade_cin(p_profile, temp_profile, parcel_temp_profile, dewpoint_profile)
                 skew.shade_cape(p_profile, temp_profile, parcel_temp_profile)
             except Exception as e:
-                # Shading might fail if no CAPE/CIN is found, so we catch the error
                 st.warning(f"CAPE/CIN bölgeleri gölgelendirilirken bir sorun oluştu: {e}")
 
             # Plot a zero degree isotherm

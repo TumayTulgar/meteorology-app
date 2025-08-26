@@ -73,7 +73,7 @@ def generate_meteorological_comment(analysis_data):
             commentary.append("- **Durum:** Orta Kararsızlık ☁️")
             commentary.append("- **Anlamı:** Atmosfer orta derecede kararsızdır. Orta kuvvette fırtınalar ve sağanak yağışlar beklenebilir.")
         elif li >= 0 and li < 3:
-            commentary.append("- **Durum:** Zayıf Kararsızlık veya Kararlı �")
+            commentary.append("- **Durum:** Zayıf Kararsızlık veya Kararlı 💧")
             commentary.append("- **Anlamı:** Atmosfer kararlıdır veya çok hafif kararsızdır. Fırtına oluşumu ihtimali düşüktür.")
         else:
             commentary.append("- **Durum:** Kararlı Atmosfer 🌬️")
@@ -258,6 +258,7 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             
             dewpoint_profile = dewpoint_from_relative_humidity(temp_profile, relative_humidity_profile)
             
+            # Use manual values for the parcel calculations
             p_start = p_start_manual * units.hPa
             t_start = t_start_manual * units.degC
             td_start = td_start_manual * units.degC
@@ -441,4 +442,3 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             st.pyplot(fig, use_container_width=True)
             st.markdown("---")
             st.info("💡 **İpuçları:** Skew-T diyagramında: Kırmızı çizgi atmosfer sıcaklığını, yeşil çizgi çiğ noktası sıcaklığını, kesik mavi çizgi ise yükselen parselin sıcaklık değişimini gösterir. LCL, LFC ve EL noktaları konvektif seviyeleri işaretler.")
-�

@@ -3,6 +3,6 @@ pandas
 numpy
 matplotlib
 metpy
-open-meteo-requests
+requests
 folium
 streamlit-folium

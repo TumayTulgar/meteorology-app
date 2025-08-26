@@ -244,7 +244,7 @@ if st.button("Analiz Et"):
         skew.ax.set_xlabel('Sıcaklık (°C)', fontsize=12)
         skew.ax.set_ylabel('Basınç (hPa)', fontsize=12)
         skew.ax.legend()
-        skew.ax.set_ylim(1050, 100)
+        skew.ax.set_ylim(1050, 1050)
         skew.ax.set_xlim(-40, 40)
         
         st.pyplot(fig)

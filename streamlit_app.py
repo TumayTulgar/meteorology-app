@@ -12,7 +12,7 @@ from metpy.plots import SkewT
 
 # --- Uygulama Başlığı ve Açıklaması ---
 st.title("Atmosferik Parsel Simülasyonu ve Skew-T Analizi")
-st.markdown("Bir konumun güncel atmosferik profilini çekerek veya manuel veri girerek parsel simülasyonu ve termodinamik indeks analizi yapar.")
+st.markdown("Bir konumun güncel atmosferik profilini çekerek ve dilerseniz başlangıç verilerini manuel olarak düzenleyerek analiz yapar.")
 
 # --- API'den Veri Çekme Fonksiyonu ---
 @st.cache_data(ttl=3600)
@@ -81,135 +81,57 @@ def get_weather_data(latitude: float, longitude: float) -> (pd.DataFrame, dict):
     except Exception as e:
         st.error(f"Hata: Veri çekilirken bir sorun oluştu. Lütfen enlem ve boylamı kontrol edin. Hata: {e}")
         return pd.DataFrame(), {}
+        
+# --- Kullanıcıdan Enlem ve Boylam Girişi Alma ---
+st.subheader("Konum Bilgileri")
+col1, col2 = st.columns(2)
+with col1:
+    user_lat = st.number_input("Enlem (°)", value=40.90, format="%.2f")
+with col2:
+    user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
 
-# --- Veri Giriş Yöntemini Seçme ---
-data_source = st.radio(
-    "Veri kaynağını seçin:",
-    ('Küresel Model Verisi Kullan', 'Manuel Veri Gir'))
-
-# --- Kullanıcıdan Giriş Alma ---
-if data_source == 'Küresel Model Verisi Kullan':
-    st.subheader("Konum Bilgileri")
-    col1, col2 = st.columns(2)
-    with col1:
-        user_lat = st.number_input("Enlem (°)", value=40.90, format="%.2f")
-    with col2:
-        user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
+if st.button("Analiz Et"):
+    st.markdown("---")
+    st.info(f"Analiz için konum: **Enlem: {user_lat:.2f}°**, **Boylam: {user_lon:.2f}°**")
     
-    if st.button("Analiz Et"):
-        st.markdown("---")
-        st.info(f"Analiz için konum: **Enlem: {user_lat:.2f}°**, **Boylam: {user_lon:.2f}°**")
+    # 1. API'den veriyi çekin
+    weather_df, current_data = get_weather_data(user_lat, user_lon)
+    
+    if weather_df.empty:
+        st.warning("Veri çekilemedi, lütfen konum değerlerini kontrol edin.")
+    else:
+        # 2. Atmosferik profilleri oluşturma
+        pressure_levels_hpa = np.array([1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30])
+        p_profile_data = np.concatenate([np.array([current_data['pressure_msl_current']]), pressure_levels_hpa])
+        p_profile = np.sort(p_profile_data)[::-1].astype(np.float64) * units.hPa
         
-        # 1. API'den veriyi çekin
-        weather_df, current_data = get_weather_data(user_lat, user_lon)
+        current_hourly_data = weather_df.iloc[0]
+        temp_profile_data = np.concatenate([np.array([current_data['temperature_2m_current']]), np.array([current_hourly_data[f'temperature_{p}hPa'] for p in pressure_levels_hpa])])
+        temp_profile = temp_profile_data.astype(np.float64) * units.degC
         
-        if weather_df.empty:
-            st.warning("Veri çekilemedi, lütfen konum değerlerini kontrol edin.")
-        else:
-            # 2. Parsel profillerini oluşturma
-            pressure_levels_hpa = np.array([1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30])
-            p_profile_data = np.concatenate([np.array([current_data['pressure_msl_current']]), pressure_levels_hpa])
-            p_profile = np.sort(p_profile_data)[::-1].astype(np.float64) * units.hPa
-            
-            current_hourly_data = weather_df.iloc[0]
-            temp_profile_data = np.concatenate([np.array([current_data['temperature_2m_current']]), np.array([current_hourly_data[f'temperature_{p}hPa'] for p in pressure_levels_hpa])])
-            temp_profile = temp_profile_data.astype(np.float64) * units.degC
-            
-            relative_humidity_profile_data = np.concatenate([np.array([current_data['relative_humidity_2m_current']]), np.array([current_hourly_data[f'relative_humidity_{p}hPa'] for p in pressure_levels_hpa])])
-            relative_humidity_profile = relative_humidity_profile_data.astype(np.float64) * units.percent
-            
-            dewpoint_profile = dewpoint_from_relative_humidity(temp_profile, relative_humidity_profile)
-            
-            # 3. Parsel verilerini tanımlama
-            p_start = np.array([current_data['pressure_msl_current']]).astype(np.float64) * units.hPa
-            t_start = np.array([current_data['temperature_2m_current']]).astype(np.float64) * units.degC
-            td_start = np.array([current_data['dew_point_2m_current']]).astype(np.float64) * units.degC
-            
-            # 4. Parsel simülasyonu ve indeks hesaplamaları
-            parcel_temp_profile = parcel_profile(p_profile, t_start[0], td_start[0])
-            
-            cape, cin = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-            mu_cape, mu_cin = most_unstable_cape_cin(p_profile, temp_profile, dewpoint_profile)
-            ml_cape, ml_cin = mixed_layer_cape_cin(p_profile, temp_profile, dewpoint_profile)
-            li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
-            k_index_val = k_index(p_profile, temp_profile, dewpoint_profile)
-            
-            lcl_p, lcl_t = lcl(p_start[0], t_start[0], td_start[0])
-            lfc_p, lfc_t = lfc(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-            el_p, el_t = el(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-            
-            # --- Sonuçları Streamlit'te Gösterme ---
-            st.header("Analiz Sonuçları")
-            st.subheader("Parsel Simülasyonu ve Termodinamik Parametreler")
-            st.write(f"**Yükselen Parselin Başlangıç Basıncı:** {p_start[0]:.2f~P}")
-            st.write(f"**Yükselen Parselin Başlangıç Sıcaklığı:** {t_start[0]:.2f~P}")
-            st.write(f"**Yükselen Parselin Başlangıç Çiğ Noktası:** {td_start[0]:.2f~P}")
-            st.write(f"**Yükselme Yoğunlaşma Seviyesi (LCL) Basıncı:** {lcl_p.to('hPa'):.2f~P}")
-            
-            st.subheader("Konvektif Seviyeler ve İndeksler")
-            st.write(f"**Serbest Konveksiyon Seviyesi (LFC) Basıncı:** {lfc_p.to('hPa'):.2f~P}")
-            st.write(f"**Denge Seviyesi (EL) Basıncı:** {el_p.to('hPa'):.2f~P}")
-            st.write(f"**Yüzeyden Yükselen Parsel için CAPE:** {cape:.2f~P}")
-            st.write(f"**Yüzeyden Yükselen Parsel için CIN:** {cin:.2f~P}")
-            st.write(f"**En Kararsız Parsel (MU-CAPE):** {mu_cape:.2f~P}")
-            st.write(f"**Karışık Katman Parseli (ML-CAPE):** {ml_cape:.2f~P}")
-            st.write(f"**Yükselme İndeksi (LI):** {li:.2f~P}")
-            st.write(f"**K-İndeksi:** {k_index_val:.2f~P}")
-            
-            # --- Skew-T Diyagramını Çizme ve Gösterme ---
-            st.header("Skew-T Diyagramı")
-            
-            fig = plt.figure(figsize=(10, 10))
-            skew = SkewT(fig, rotation=45)
-            
-            skew.plot(p_profile, temp_profile, 'r', linewidth=2, label='Atmosfer Sıcaklığı')
-            skew.plot(p_profile, dewpoint_profile, 'g', linewidth=2, label='Atmosfer Çiğ Noktası')
-            skew.plot(p_profile, parcel_temp_profile, 'k', linestyle='--', linewidth=2, label='Yükselen Parsel')
-            
-            skew.plot_dry_adiabats()
-            skew.plot_moist_adiabats()
-            skew.plot_mixing_lines()
-            
-            skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', markersize=8, label='LCL')
-            skew.plot(lfc_p, lfc_t, 'ro', markerfacecolor='red', markersize=8, label='LFC')
-            skew.plot(el_p, el_t, 'bo', markerfacecolor='blue', markersize=8, label='EL')
-            
-            skew.ax.set_title(f'Skew-T Diyagramı (Konum: {user_lat:.2f}, {user_lon:.2f})', fontsize=16)
-            skew.ax.set_xlabel(f'Sıcaklık (°C) / Yüzey Basıncı: {current_data["pressure_msl_current"]:.0f} hPa', fontsize=12)
-            skew.ax.set_ylabel('Basınç (hPa)', fontsize=12)
-            skew.ax.legend()
-            skew.ax.set_ylim(1050, 100)
-            skew.ax.set_xlim(-40, 40)
-            
-            st.pyplot(fig)
-
-elif data_source == 'Manuel Veri Gir':
-    st.subheader("Manuel Veri Girişi (Sadece Başlangıç Değerleri)")
-    st.warning("Bu modda sadece yükselen parselin yolu gösterilecektir, çevresel atmosfer profili bulunmamaktadır.")
-
-    p_start_manual = st.number_input("Parsel Başlangıç Basıncı (hPa)", value=1000.0, step=0.1)
-    t_start_manual = st.number_input("Parsel Başlangıç Sıcaklığı (°C)", value=25.0, step=0.1)
-    td_start_manual = st.number_input("Parsel Başlangıç Çiğ Noktası (°C)", value=15.0, step=0.1)
-
-    if st.button("Manuel Verilerle Analiz Et"):
-        st.markdown("---")
+        relative_humidity_profile_data = np.concatenate([np.array([current_data['relative_humidity_2m_current']]), np.array([current_hourly_data[f'relative_humidity_{p}hPa'] for p in pressure_levels_hpa])])
+        relative_humidity_profile = relative_humidity_profile_data.astype(np.float64) * units.percent
         
-        # --- Verileri birimlere dönüştürme ---
+        dewpoint_profile = dewpoint_from_relative_humidity(temp_profile, relative_humidity_profile)
+        
+        # --- Manuel Başlangıç Değerlerini Belirleme ---
+        with st.expander("Manuel Başlangıç Değerlerini Düzenle"):
+            st.info("Yükselen parselin başlangıç değerlerini manuel olarak değiştirebilirsiniz. Varsayılan değerler küresel modelden alınmıştır.")
+            p_start_manual = st.number_input("Parsel Başlangıç Basıncı (hPa)", value=current_data['pressure_msl_current'], step=0.1)
+            t_start_manual = st.number_input("Parsel Başlangıç Sıcaklığı (°C)", value=current_data['temperature_2m_current'], step=0.1)
+            td_start_manual = st.number_input("Parsel Başlangıç Çiğ Noktası (°C)", value=current_data['dew_point_2m_current'], step=0.1)
+
+        # --- Parsel verilerini birimlere dönüştürme ---
         p_start = p_start_manual * units.hPa
         t_start = t_start_manual * units.degC
         td_start = td_start_manual * units.degC
         
-        # --- Yükselen parsel profilini oluşturmak için basınç seviyeleri oluşturma ---
-        p_profile = np.linspace(p_start.m, 100, num=50) * units.hPa
-        
-        # --- Parsel simülasyonu ve indeks hesaplamaları ---
+        # 4. Parsel simülasyonu ve indeks hesaplamaları
         parcel_temp_profile = parcel_profile(p_profile, t_start, td_start)
         
-        # Boş profiller oluşturarak Skew-T'nin çizim yapmamasını sağlıyoruz
-        temp_profile = np.full_like(p_profile.m, np.nan) * units.degC
-        dewpoint_profile = np.full_like(p_profile.m, np.nan) * units.degC
-        
         cape, cin = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
+        mu_cape, mu_cin = most_unstable_cape_cin(p_profile, temp_profile, dewpoint_profile)
+        ml_cape, ml_cin = mixed_layer_cape_cin(p_profile, temp_profile, dewpoint_profile)
         li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
         k_index_val = k_index(p_profile, temp_profile, dewpoint_profile)
         
@@ -219,7 +141,7 @@ elif data_source == 'Manuel Veri Gir':
         
         # --- Sonuçları Streamlit'te Gösterme ---
         st.header("Analiz Sonuçları")
-        st.subheader("Manuel Veri ile Parsel Simülasyonu")
+        st.subheader("Parsel Simülasyonu ve Termodinamik Parametreler")
         st.write(f"**Yükselen Parselin Başlangıç Basıncı:** {p_start:.2f~P}")
         st.write(f"**Yükselen Parselin Başlangıç Sıcaklığı:** {t_start:.2f~P}")
         st.write(f"**Yükselen Parselin Başlangıç Çiğ Noktası:** {td_start:.2f~P}")
@@ -230,26 +152,35 @@ elif data_source == 'Manuel Veri Gir':
         st.write(f"**Denge Seviyesi (EL) Basıncı:** {el_p.to('hPa'):.2f~P}")
         st.write(f"**Yüzeyden Yükselen Parsel için CAPE:** {cape:.2f~P}")
         st.write(f"**Yüzeyden Yükselen Parsel için CIN:** {cin:.2f~P}")
+        st.write(f"**En Kararsız Parsel (MU-CAPE):** {mu_cape:.2f~P}")
+        st.write(f"**Karışık Katman Parseli (ML-CAPE):** {ml_cape:.2f~P}")
         st.write(f"**Yükselme İndeksi (LI):** {li:.2f~P}")
         st.write(f"**K-İndeksi:** {k_index_val:.2f~P}")
         
         # --- Skew-T Diyagramını Çizme ve Gösterme ---
-        st.header("Skew-T Diyagramı (Manuel Veri - Sadece Parsel)")
+        st.header("Skew-T Diyagramı")
+        
         fig = plt.figure(figsize=(10, 10))
         skew = SkewT(fig, rotation=45)
         
-        # Sadece parsel yolunu çiziyoruz
-        skew.plot(p_profile, parcel_temp_profile, 'k', linestyle='--', linewidth=2, label='Yükselen Parsel')
-
+        # Çevresel atmosfer ve çiğ noktası çizimi
+        skew.plot(p_profile, temp_profile, 'r', linewidth=2, label='Atmosfer Sıcaklığı')
+        skew.plot(p_profile, dewpoint_profile, 'g', linewidth=2, label='Atmosfer Çiğ Noktası')
+        
+        # Parsel yolu çizimi
+        skew.plot(p_profile, parcel_temp_profile, 'k', linestyle='--', linewidth=2, label='Yükselen Parsel (Manuel Başlangıç)')
+        
+        # Adyabatik ve karıştırma çizgileri
         skew.plot_dry_adiabats()
         skew.plot_moist_adiabats()
         skew.plot_mixing_lines()
         
+        # LCL, LFC, EL noktaları
         skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', markersize=8, label='LCL')
         skew.plot(lfc_p, lfc_t, 'ro', markerfacecolor='red', markersize=8, label='LFC')
         skew.plot(el_p, el_t, 'bo', markerfacecolor='blue', markersize=8, label='EL')
         
-        skew.ax.set_title('Skew-T Diyagramı (Manuel Veri - Sadece Parsel)', fontsize=16)
+        skew.ax.set_title(f'Skew-T Diyagramı (Konum: {user_lat:.2f}, {user_lon:.2f})', fontsize=16)
         skew.ax.set_xlabel('Sıcaklık (°C)', fontsize=12)
         skew.ax.set_ylabel('Basınç (hPa)', fontsize=12)
         skew.ax.legend()

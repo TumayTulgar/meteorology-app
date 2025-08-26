@@ -214,7 +214,7 @@ if st.button("Analiz Et"):
         # --- Skew-T Diyagramını Çizme ve Gösterme ---
         st.header("Skew-T Diyagramı")
         
-        fig = plt.figure(figsize=(20, 20))
+        fig = plt.figure(figsize=(14, 14))
         skew = SkewT(fig, rotation=45)
         
         # Çevresel atmosfer ve çiğ noktası çizimi

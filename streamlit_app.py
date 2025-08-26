@@ -27,6 +27,7 @@ def ask_gemini_api(data_to_analyze):
     # Gemini API'nin doğru endpoint'ini buraya yazın.
     endpoint = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
     
+    # Prompt'ta değerlerin kontrolü yapılıyor.
     prompt = f"""
     Aşağıdaki meteorolojik verileri analiz et ve bir cümlelik kısa bir yorum yap. 
     Verilen tüm indeksleri (CAPE, CIN, LI, vb.) ve değerleri dikkate al. 
@@ -64,7 +65,6 @@ def ask_gemini_api(data_to_analyze):
         
         result = response.json()
         
-        # Yanıttan metin içeriğini çek
         summary = result['candidates'][0]['content']['parts'][0]['text']
         return summary
     

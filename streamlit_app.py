@@ -362,18 +362,34 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             fig = plt.figure(figsize=(12, 12))
             skew = SkewT(fig, rotation=45)
             
+            # Plot the data using normal plotting functions, in this case using
+            # log scaling in Y, as dictated by the typical meteorological plot
             skew.plot(p_profile, temp_profile, 'red', linewidth=2.5, linestyle='-', label='Atmosfer Sıcaklığı',
                       path_effects=[pe.Stroke(linewidth=3.5, foreground='black'), pe.Normal()])
             skew.plot(p_profile, dewpoint_profile, 'green', linewidth=2.5, linestyle='-', label='Atmosfer Çiğ Noktası',
                       path_effects=[pe.Stroke(linewidth=3.5, foreground='black'), pe.Normal()])
-            
+
+            # Plot the parcel profile as a black line
             skew.plot(p_profile, parcel_temp_profile, 'blue', linestyle='--', linewidth=2, label='Yükselen Parsel (Manuel Başlangıç)',
                       path_effects=[pe.Stroke(linewidth=3, foreground='gray'), pe.Normal()])
             
+            # Shade areas of CAPE and CIN
+            try:
+                skew.shade_cin(p_profile, temp_profile, parcel_temp_profile, dewpoint_profile)
+                skew.shade_cape(p_profile, temp_profile, parcel_temp_profile)
+            except Exception as e:
+                # Shading might fail if no CAPE/CIN is found, so we catch the error
+                st.warning(f"CAPE/CIN bölgeleri gölgelendirilirken bir sorun oluştu: {e}")
+
+            # Plot a zero degree isotherm
+            skew.ax.axvline(0, color='c', linestyle='--', linewidth=2, label='0°C İzotermi')
+
+            # Add the relevant special lines
             skew.plot_dry_adiabats(color='gray', linestyle=':', alpha=0.5)
             skew.plot_moist_adiabats(color='darkgreen', linestyle=':', alpha=0.5)
             skew.plot_mixing_lines(color='brown', linestyle=':', alpha=0.5)
             
+            # Plot LCL, LFC, and EL if they exist
             if lcl_p is not None and lcl_t is not None:
                 skew.plot(lcl_p, lcl_t, 'o', markerfacecolor='black', markeredgecolor='white', markersize=8)
                 skew.ax.text(lcl_t.magnitude + 1, lcl_p.magnitude, 'LCL', 
@@ -392,6 +408,7 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
                              fontsize=11, color='white', ha='left', va='center',
                              path_effects=[pe.Stroke(linewidth=2, foreground='blue'), pe.Normal()])
 
+            # Plot wind barbs
             wind_p_levels = pressure_levels_hpa * units.hPa
             wind_speed_profile_data = np.array([current_hourly_data.get(f'wind_speed_{p}hPa') for p in pressure_levels_hpa])
             wind_direction_profile_data = np.array([current_hourly_data.get(f'wind_direction_{p}hPa') for p in pressure_levels_hpa])
@@ -403,13 +420,14 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
                 valid_directions = wind_direction_profile_data[valid_indices] * units.degrees
                 valid_levels = wind_p_levels[valid_indices]
                 
-                skew.plot_barbs(valid_levels, valid_speeds, valid_directions, 
+                # Corrected plot_barbs usage to avoid AttributeError
+                skew.plot_barbs(valid_levels, valid_speeds, valid_directions,
                                 xloc=0.9,
-                                fill_empty_barb=False,
-                                sizes=dict(emptybarb=0.075, half=0.1, full=0.15, flag=0.15),
-                                barb_kwargs={'color': 'purple', 'linewidth': 1.5})
+                                length=6,
+                                barbcolor='purple')
                 st.markdown("*(Sağ kenardaki mor oklar rüzgar yönü ve hızını göstermektedir.)*")
 
+            # Final plot settings
             skew.ax.set_title(f'Skew-T Diyagramı (Konum: {user_lat:.2f}, {user_lon:.2f})', fontsize=16, weight='bold')
             skew.ax.set_xlabel('Sıcaklık (°C)', fontsize=12)
             skew.ax.set_ylabel('Basınç (hPa)', fontsize=12)

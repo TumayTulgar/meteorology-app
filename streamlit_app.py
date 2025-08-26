@@ -90,18 +90,25 @@ with col1:
 with col2:
     user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
 
-# --- Seçilebilecek değer listelerini tanımla ---
-pressure_options = [1020.0, 1018.0, 1015.0, 1013.25, 1010.0, 1005.0, 1000.0, 995.0, 990.0]
-temperature_options = [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0]
-dewpoint_options = [-10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0]
-
-# --- Manuel Başlangıç Değerlerini Belirleme (Selectbox kullanılarak) ---
+# --- Manuel Başlangıç Değerlerini Belirleme (st.number_input kullanılarak) ---
 with st.expander("Manuel Başlangıç Değerlerini Düzenle"):
-    st.info("Yükselen parselin başlangıç değerlerini listeden seçerek değiştirebilirsiniz.")
+    st.info("Yükselen parselin başlangıç değerlerini klavyeyle girerek veya ok tuşlarıyla değiştirin.")
     
-    p_start_manual = st.selectbox("Parsel Başlangıç Basıncı (hPa)", options=pressure_options, index=3) # Varsayılan 1013.25
-    t_start_manual = st.selectbox("Parsel Başlangıç Sıcaklığı (°C)", options=temperature_options, index=5) # Varsayılan 20.0
-    td_start_manual = st.selectbox("Parsel Başlangıç Çiğ Noktası (°C)", options=dewpoint_options, index=4) # Varsayılan 10.0
+    p_start_manual = st.number_input("Parsel Başlangıç Basıncı (hPa)", 
+                                      min_value=980.0, 
+                                      max_value=1050.0, 
+                                      value=1013.25, 
+                                      step=1.0)
+    t_start_manual = st.number_input("Parsel Başlangıç Sıcaklığı (°C)", 
+                                      min_value=-50.0, 
+                                      max_value=50.0, 
+                                      value=20.0, 
+                                      step=0.5)
+    td_start_manual = st.number_input("Parsel Başlangıç Çiğ Noktası (°C)", 
+                                       min_value=-50.0, 
+                                       max_value=50.0, 
+                                       value=10.0, 
+                                       step=0.5)
 
 if st.button("Analiz Et"):
     st.markdown("---")

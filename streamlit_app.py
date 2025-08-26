@@ -21,7 +21,7 @@ def ask_gemini_api(data_to_analyze):
     """
     
     # GERÇEK API ANAHTARINIZI BURAYA EKLEYİN.
-    # UYARI: BU KODU GİTHUB'A GENEL OLARAK YÜKLERKEN ANAHTARINIZI SİLMEYİ UNUTMAYIN.
+    # DİKKAT: BU KODU HERKESE AÇIK BİR PLATFORMA YÜKLERKEN ANAHTARINIZI GİZLEMEYİ UNUTMAYIN.
     API_KEY = "AIzaSyCUoM1fEkw3JVfWfB78BMu25S2C3vQH8Bs"  
     
     # Gemini API'nin doğru endpoint'ini buraya yazın.
@@ -250,17 +250,18 @@ if st.button("Analiz Et"):
         st.write(f"**Yükselme İndeksi (LI):** {li:.2f~P}")
         st.write(f"**K-İndeksi:** {k_index_val:.2f~P}")
         
-        # --- API İLE YORUMLAMA BÖLÜMÜNÜN YENİ KODU ---
+        # --- API İLE YORUMLAMA BÖLÜMÜ ---
         st.subheader("Meteorolojik Durum Özeti (AI Destekli)")
         st.markdown("---")
         
+        # TypeError'ı önlemek için değerleri kontrol ederek sözlüğü oluşturun
         analysis_data = {
             'cape': cape.to('J/kg').magnitude,
             'cin': cin.to('J/kg').magnitude,
             'mu_cape': mu_cape.to('J/kg').magnitude,
             'ml_cape': ml_cape.to('J/kg').magnitude,
-            'li': li.magnitude if li is not None else 999,
-            'k_index': k_index_val.magnitude if k_index_val is not None else 999,
+            'li': li.magnitude if li is not None and np.isfinite(li.magnitude) else -999.0,
+            'k_index': k_index_val.magnitude if k_index_val is not None and np.isfinite(k_index_val.magnitude) else -999.0,
         }
         
         with st.spinner('Yapay zeka analiz yapıyor, lütfen bekleyin...'):

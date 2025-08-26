@@ -265,6 +265,7 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             
             parcel_temp_profile = parcel_profile(p_profile, t_start, td_start)
             
+            # Initialize variables to NaN to prevent errors if calculations fail
             cape, cin = np.nan * units.J/units.kg, np.nan * units.J/units.kg
             mu_cape, mu_cin = np.nan * units.J/units.kg, np.nan * units.J/units.kg
             ml_cape, ml_cin = np.nan * units.J/units.kg, np.nan * units.J/units.kg
@@ -274,52 +275,53 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             lfc_p, lfc_t = None, None
             el_p, el_t = None, None
 
+            # Wrap all MetPy calculations in try-except blocks
             try:
                 cape, cin = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
                 if cape.size == 0: cape = np.nan * units.J/units.kg
                 if cin.size == 0: cin = np.nan * units.J/units.kg
-            except (ValueError, IndexError) as e:
+            except (ValueError, IndexError, AttributeError) as e:
                 st.warning(f"CAPE/CIN hesaplanırken bir hata oluştu: {e}")
 
             try:
                 mu_cape, mu_cin = most_unstable_cape_cin(p_profile, temp_profile, dewpoint_profile)
                 if mu_cape.size == 0: mu_cape = np.nan * units.J/units.kg
                 if mu_cin.size == 0: mu_cin = np.nan * units.J/units.kg
-            except (ValueError, IndexError) as e:
+            except (ValueError, IndexError, AttributeError) as e:
                 st.warning(f"MU-CAPE/CIN hesaplanırken bir hata oluştu: {e}")
 
             try:
                 ml_cape, ml_cin = mixed_layer_cape_cin(p_profile, temp_profile, dewpoint_profile)
                 if ml_cape.size == 0: ml_cape = np.nan * units.J/units.kg
                 if ml_cin.size == 0: ml_cin = np.nan * units.J/units.kg
-            except (ValueError, IndexError) as e:
+            except (ValueError, IndexError, AttributeError) as e:
                 st.warning(f"ML-CAPE/CIN hesaplanırken bir hata oluştu: {e}")
             
             try:
                 li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
                 if li.size == 0: li = np.nan * units.degC
-            except (ValueError, IndexError) as e:
+            except (ValueError, IndexError, AttributeError) as e:
                 st.warning(f"LI hesaplanırken bir hata oluştu: {e}")
 
             try:
                 k_index_val = k_index(p_profile, temp_profile, dewpoint_profile)
                 if k_index_val.size == 0: k_index_val = np.nan * units.degC
-            except (ValueError, IndexError) as e:
+            except (ValueError, IndexError, AttributeError) as e:
                 st.warning(f"K-İndeksi hesaplanırken bir hata oluştu: {e}")
             
             try:
                 lcl_p, lcl_t = lcl(p_start, t_start, td_start)
-            except (ValueError, IndexError):
+            except (ValueError, IndexError, AttributeError):
                 lcl_p, lcl_t = None, None
                 
             try:
                 lfc_p, lfc_t = lfc(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-            except (ValueError, IndexError):
+            except (ValueError, IndexError, AttributeError):
                 lfc_p, lfc_t = None, None
                 
             try:
                 el_p, el_t = el(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-            except (ValueError, IndexError):
+            except (ValueError, IndexError, AttributeError):
                 el_p, el_t = None, None
             
             st.success("Analiz tamamlandı!")

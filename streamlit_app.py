@@ -34,7 +34,7 @@ def get_weather_data(latitude: float, longitude: float) -> (pd.DataFrame, dict):
             "temperature_975hPa", "relative_humidity_975hPa", "wind_speed_975hPa", "wind_direction_975hPa", "geopotential_height_975hPa",
             "temperature_950hPa", "relative_humidity_950hPa", "wind_speed_950hPa", "wind_direction_950hPa", "geopotential_height_950hPa",
             "temperature_925hPa", "relative_humidity_925hPa", "wind_speed_925hPa", "wind_direction_925hPa", "geopotential_height_925hPa",
-            "temperature_900hPa", "relative_humidity_900hPa", "wind_speed_900hPa", "wind_direction_900hPa", "geopotential_height_900hPa",
+            "temperature_900hPa", "relative_humidity_900hPa", "wind_speed_900hPa", "wind_direction_900hPa", "geopotential_height_999hPa",
             "temperature_850hPa", "relative_humidity_850hPa", "wind_speed_850hPa", "wind_direction_850hPa", "geopotential_height_850hPa",
             "temperature_800hPa", "relative_humidity_800hPa", "wind_speed_800hPa", "wind_direction_800hPa", "geopotential_height_800hPa",
             "temperature_700hPa", "relative_humidity_700hPa", "wind_speed_700hPa", "wind_direction_700hPa", "geopotential_height_700hPa",
@@ -98,7 +98,7 @@ if not weather_df.empty:
         st.info("Yükselen parselin başlangıç değerlerini kaydırıcıları kullanarak seçin.")
         
         # Küresel modelden gelen değerleri göster
-        st.write(f"**Küresel modelden gelen değerler:**")
+        st.write(f"**Küresel modelden gelen değerler (2m):**")
         st.write(f"  - Basınç: **{current_data['pressure_msl_current']:.2f} hPa**")
         st.write(f"  - Sıcaklık: **{current_data['temperature_2m_current']:.2f} °C**")
         st.write(f"  - Çiğ Noktası: **{current_data['dew_point_2m_current']:.2f} °C**")
@@ -126,6 +126,7 @@ if not weather_df.empty:
                                     step=0.5)
 else:
     st.warning("Veri çekilemedi. Manuel girişler için lütfen konum verilerini kontrol edin.")
+    # Varsayılan değerler
     t_start_manual, td_start_manual, p_start_manual = 20.0, 10.0, 1013.25
 
 if st.button("Analiz Et"):
@@ -184,6 +185,31 @@ if st.button("Analiz Et"):
         st.write(f"**Karışık Katman Parseli (ML-CAPE):** {ml_cape:.2f~P}")
         st.write(f"**Yükselme İndeksi (LI):** {li:.2f~P}")
         st.write(f"**K-İndeksi:** {k_index_val:.2f~P}")
+
+        st.subheader("Meteorolojik Durum Özeti")
+        st.markdown("---")
+        
+        # --- AI Benzeri Yorumlama ---
+        ozet_metni = ""
+        cape_joule = cape.to('J/kg').magnitude
+        cin_joule = cin.to('J/kg').magnitude
+        li_val = li.magnitude if li is not None else np.inf
+        k_index_val_mag = k_index_val.magnitude if k_index_val is not None else 0
+
+        if cape_joule > 1500 and cin_joule < 100 and li_val < -5:
+            ozet_metni = "**Hava Durumu Potansiyel Olarak Çok Şiddetli Fırtınalara Açık!** Atmosferde yüksek miktarda konvektif enerji birikmiş durumda ve konveksiyonu engelleyici bir katman bulunmuyor. Şiddetli sağanak, dolu ve kuvvetli rüzgarlar beklenebilir. **Çok dikkatli olunmalı!**"
+        elif cape_joule > 500 and cin_joule < 50 and li_val < -2:
+            ozet_metni = "**Fırtına Potansiyeli Yüksek!** Atmosfer kararsız ve yeterli konvektif enerji mevcut. Yerel olarak kuvvetli gök gürültülü sağanaklar ve hatta dolu görülebilir. Hava durumunu yakından takip edin."
+        elif cape_joule > 100 and cin_joule < 150 and k_index_val_mag > 25:
+            ozet_metni = "**Hafif ila Orta Dereceli Fırtına Potansiyeli.** Atmosferde bir miktar kararsızlık var ve sağanak olasılığı bulunuyor. Şiddetli fırtına riski düşük olsa da ani yerel sağanaklar olabilir."
+        elif cape_joule < 50 and cin_joule > 0 and li_val > 0:
+            ozet_metni = "**Genel Olarak Kararlı Atmosfer.** Konvektif enerji çok düşük ve atmosfer oldukça kararlı. Fırtına veya önemli bir yağış beklenmiyor."
+        else:
+            ozet_metni = "Mevcut meteorolojik verilerle ilgili spesifik bir yorum yapılamamaktadır. Ancak genel olarak atmosferik koşullar kararlı veya zayıf konvektif aktiviteye işaret etmektedir."
+        
+        st.markdown(ozet_metni)
+
+        st.markdown("---")
         
         # --- Skew-T Diyagramını Çizme ve Gösterme ---
         st.header("Skew-T Diyagramı")
@@ -203,10 +229,16 @@ if st.button("Analiz Et"):
         skew.plot_moist_adiabats()
         skew.plot_mixing_lines()
         
-        # LCL, LFC, EL noktaları
-        skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', markersize=8, label='LCL')
-        skew.plot(lfc_p, lfc_t, 'ro', markerfacecolor='red', markersize=8, label='LFC')
-        skew.plot(el_p, el_t, 'bo', markerfacecolor='blue', markersize=8, label='EL')
+        # LCL, LFC, EL noktaları ve etiketleri
+        skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', markersize=8)
+        skew.ax.text(lcl_t.magnitude + 2, lcl_p.magnitude, 'LCL', fontsize=11, color='black', ha='left', va='center')
+        
+        skew.plot(lfc_p, lfc_t, 'ro', markerfacecolor='red', markersize=8)
+        skew.ax.text(lfc_t.magnitude + 2, lfc_p.magnitude, 'LFC', fontsize=11, color='red', ha='left', va='center')
+        
+        if el_p is not None and el_t is not None:
+            skew.plot(el_p, el_t, 'bo', markerfacecolor='blue', markersize=8)
+            skew.ax.text(el_t.magnitude + 2, el_p.magnitude, 'EL', fontsize=11, color='blue', ha='left', va='center')
         
         skew.ax.set_title(f'Skew-T Diyagramı (Konum: {user_lat:.2f}, {user_lon:.2f})', fontsize=16)
         skew.ax.set_xlabel('Sıcaklık (°C)', fontsize=12)

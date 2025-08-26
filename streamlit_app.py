@@ -11,6 +11,9 @@ from metpy.calc import (
 from metpy.plots import SkewT
 import matplotlib.patheffects as pe
 
+# API'yi manuel olarak çağırmak için
+import requests
+
 # Harita için gerekli
 import folium
 from streamlit_folium import folium_static
@@ -139,76 +142,72 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("© 2023 Meteoroloji Uygulaması")
 
 
-# --- API'den Veri Çekme Fonksiyonu ---
+# --- API'den Veri Çekme Fonksiyonu (Manuel Requests ile) ---
 @st.cache_data(ttl=3600)
 def get_weather_data(latitude: float, longitude: float) -> (pd.DataFrame, dict):
     try:
-        import openmeteo_requests
-        import requests_cache
-        from retry_requests import retry
-        
-        cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
-        retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
-        openmeteo = openmeteo_requests.Client(session=retry_session)
-
         url = "https://api.open-meteo.com/v1/forecast"
-        hourly_variables = [
-            "temperature_2m", "relative_humidity_2m", "dew_point_2m", "pressure_msl",
-            "surface_pressure",
-            "temperature_1000hPa", "relative_humidity_1000hPa", "wind_speed_1000hPa", "wind_direction_1000hPa", "geopotential_height_1000hPa",
-            "temperature_975hPa", "relative_humidity_975hPa", "wind_speed_975hPa", "wind_direction_975hPa", "geopotential_height_975hPa",
-            "temperature_950hPa", "relative_humidity_950hPa", "wind_speed_950hPa", "wind_direction_950hPa", "geopotential_height_950hPa",
-            "temperature_925hPa", "relative_humidity_925hPa", "wind_speed_925hPa", "wind_direction_925hPa", "geopotential_height_925hPa",
-            "temperature_900hPa", "relative_humidity_900hPa", "wind_speed_900hPa", "wind_direction_900hPa", "geopotential_height_999hPa",
-            "temperature_850hPa", "relative_humidity_850hPa", "wind_speed_850hPa", "wind_direction_850hPa", "geopotential_height_850hPa",
-            "temperature_800hPa", "relative_humidity_800hPa", "wind_speed_800hPa", "wind_direction_800hPa", "geopotential_height_800hPa",
-            "temperature_700hPa", "relative_humidity_700hPa", "wind_speed_700hPa", "wind_direction_700hPa", "geopotential_height_700hPa",
-            "temperature_600hPa", "relative_humidity_600hPa", "wind_speed_600hPa", "wind_direction_600hPa", "geopotential_height_600hPa",
-            "temperature_500hPa", "relative_humidity_500hPa", "wind_speed_500hPa", "wind_direction_500hPa", "geopotential_height_500hPa",
-            "temperature_400hPa", "relative_humidity_400hPa", "wind_speed_400hPa", "wind_direction_400hPa", "geopotential_height_400hPa",
-            "temperature_300hPa", "relative_humidity_300hPa", "wind_speed_300hPa", "wind_direction_300hPa", "geopotential_height_300hPa",
-            "temperature_250hPa", "relative_humidity_250hPa", "wind_speed_250hPa", "wind_direction_250hPa", "geopotential_height_250hPa",
-            "temperature_200hPa", "relative_humidity_200hPa", "wind_speed_200hPa", "wind_direction_200hPa", "geopotential_height_200hPa",
-            "temperature_150hPa", "relative_humidity_150hPa", "wind_speed_150hPa", "wind_direction_150hPa", "geopotential_height_150hPa",
-            "temperature_100hPa", "relative_humidity_100hPa", "wind_speed_100hPa", "wind_direction_100hPa", "geopotential_height_100hPa",
-            "temperature_70hPa", "relative_humidity_70hPa", "wind_speed_70hPa", "wind_direction_70hPa", "geopotential_height_70hPa",
-            "temperature_50hPa", "relative_humidity_50hPa", "wind_speed_50hPa", "wind_direction_50hPa", "geopotential_height_50hPa",
-            "temperature_30hPa", "relative_humidity_30hPa", "wind_speed_30hPa", "wind_direction_30hPa", "geopotential_height_30hPa",
-        ]
         params = {
             "latitude": latitude,
             "longitude": longitude,
-            "hourly": hourly_variables,
+            "hourly": [
+                "temperature_2m", "relative_humidity_2m", "dew_point_2m",
+                "pressure_msl", "temperature_1000hPa", "relative_humidity_1000hPa", "wind_speed_1000hPa", "wind_direction_1000hPa", "geopotential_height_1000hPa",
+                "temperature_975hPa", "relative_humidity_975hPa", "wind_speed_975hPa", "wind_direction_975hPa", "geopotential_height_975hPa",
+                "temperature_950hPa", "relative_humidity_950hPa", "wind_speed_950hPa", "wind_direction_950hPa", "geopotential_height_950hPa",
+                "temperature_925hPa", "relative_humidity_925hPa", "wind_speed_925hPa", "wind_direction_925hPa", "geopotential_height_925hPa",
+                "temperature_900hPa", "relative_humidity_900hPa", "wind_speed_900hPa", "wind_direction_900hPa", "geopotential_height_900hPa",
+                "temperature_850hPa", "relative_humidity_850hPa", "wind_speed_850hPa", "wind_direction_850hPa", "geopotential_height_850hPa",
+                "temperature_800hPa", "relative_humidity_800hPa", "wind_speed_800hPa", "wind_direction_800hPa", "geopotential_height_800hPa",
+                "temperature_700hPa", "relative_humidity_700hPa", "wind_speed_700hPa", "wind_direction_700hPa", "geopotential_height_700hPa",
+                "temperature_600hPa", "relative_humidity_600hPa", "wind_speed_600hPa", "wind_direction_600hPa", "geopotential_height_600hPa",
+                "temperature_500hPa", "relative_humidity_500hPa", "wind_speed_500hPa", "wind_direction_500hPa", "geopotential_height_500hPa",
+                "temperature_400hPa", "relative_humidity_400hPa", "wind_speed_400hPa", "wind_direction_400hPa", "geopotential_height_400hPa",
+                "temperature_300hPa", "relative_humidity_300hPa", "wind_speed_300hPa", "wind_direction_300hPa", "geopotential_height_300hPa",
+                "temperature_250hPa", "relative_humidity_250hPa", "wind_speed_250hPa", "wind_direction_250hPa", "geopotential_height_250hPa",
+                "temperature_200hPa", "relative_humidity_200hPa", "wind_speed_200hPa", "wind_direction_200hPa", "geopotential_height_200hPa",
+                "temperature_150hPa", "relative_humidity_150hPa", "wind_speed_150hPa", "wind_direction_150hPa", "geopotential_height_150hPa",
+                "temperature_100hPa", "relative_humidity_100hPa", "wind_speed_100hPa", "wind_direction_100hPa", "geopotential_height_100hPa",
+                "temperature_70hPa", "relative_humidity_70hPa", "wind_speed_70hPa", "wind_direction_70hPa", "geopotential_height_70hPa",
+                "temperature_50hPa", "relative_humidity_50hPa", "wind_speed_50hPa", "wind_direction_50hPa", "geopotential_height_50hPa",
+                "temperature_30hPa", "relative_humidity_30hPa", "wind_speed_30hPa", "wind_direction_30hPa", "geopotential_height_30hPa",
+            ],
             "current": ["temperature_2m", "relative_humidity_2m", "pressure_msl", "dew_point_2m", "wind_speed_10m", "wind_direction_10m"],
             "timezone": "auto",
             "forecast_days": 1,
         }
         
-        responses = openmeteo.weather_api(url, params=params)
-        hourly = responses[0].Hourly()
-        hourly_data = {}
-        for i, var_name in enumerate(hourly_variables):
-            hourly_data[var_name] = hourly.Variables(i).ValuesAsNumpy()
-        hourly_df = pd.DataFrame(data=hourly_data)
+        response = requests.get(url, params=params)
+        response.raise_for_status()  # Hata varsa istisna fırlatır
+        data = response.json()
+
+        hourly_data = data.get('hourly', {})
+        current_data_raw = data.get('current', {})
+
+        # Zaman serisi verilerini DataFrame'e dönüştür
+        if not hourly_data or 'time' not in hourly_data:
+            return pd.DataFrame(), {}
+            
+        hourly_df = pd.DataFrame(hourly_data)
         
-        current = responses[0].Current()
+        # Güncel verileri dictionary'ye al
         current_data = {
-            'pressure_msl_current': current.Variables(2).Value(),
-            'temperature_2m_current': current.Variables(0).Value(),
-            'dew_point_2m_current': current.Variables(3).Value(),
-            'relative_humidity_2m_current': current.Variables(1).Value(),
-            'wind_speed_10m_current': current.Variables(4).Value(),
-            'wind_direction_10m_current': current.Variables(5).Value(),
+            'pressure_msl_current': current_data_raw.get('pressure_msl'),
+            'temperature_2m_current': current_data_raw.get('temperature_2m'),
+            'dew_point_2m_current': current_data_raw.get('dew_point_2m'),
+            'relative_humidity_2m_current': current_data_raw.get('relative_humidity_2m'),
+            'wind_speed_10m_current': current_data_raw.get('wind_speed_10m'),
+            'wind_direction_10m_current': current_data_raw.get('wind_direction_10m'),
         }
         
         return hourly_df, current_data
 
-    except Exception as e:
-        st.error(f"Hata: Veri çekilirken bir sorun oluştu. Lütfen enlem ve boylamı kontrol edin. Hata: {e}")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Hata: Veri çekilirken bir sorun oluştu. Lütfen enlem ve boylamı kontrol edin veya internet bağlantınızı kontrol edin. Hata: {e}")
         return pd.DataFrame(), {}
-        
-# API'den veriyi çekin (Bu kısım butonun dışına alındı)
-weather_df, current_data = get_weather_data(user_lat, user_lon)
+    except Exception as e:
+        st.error(f"Genel bir hata oluştu: {e}")
+        return pd.DataFrame(), {}
 
 # --- Harita Gösterimi ---
 st.subheader(f"Harita üzerinde konum: Tekirdağ, Tekirdağ, Türkiye ({user_lat:.2f}°, {user_lon:.2f}°)")
@@ -219,7 +218,10 @@ folium.Marker([user_lat, user_lon],
 folium_static(m, width=700, height=300) # Harita boyutunu ayarlayabilirsiniz.
 
 
-if not weather_df.empty:
+# API'den veriyi çekin (Bu kısım butonun dışına alındı)
+weather_df, current_data = get_weather_data(user_lat, user_lon)
+
+if not weather_df.empty and all(v is not None for v in current_data.values()):
     # --- Anlık Hava Durumu Metrikleri ---
     st.subheader("Anlık Hava Durumu Bilgileri")
     col1, col2, col3, col4 = st.columns(4)
@@ -260,7 +262,7 @@ else:
 
 st.markdown("---")
 if st.button("🚀 Atmosferi Analiz Et", type="primary"):
-    if weather_df.empty:
+    if weather_df.empty or any(v is None for v in current_data.values()):
         st.error("Analiz için hava durumu verisi bulunamadı. Lütfen geçerli bir konum girdiğinizden emin olun.")
     else:
         with st.spinner('Atmosferik veriler analiz ediliyor, lütfen bekleyin...'):
@@ -269,6 +271,7 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             p_profile_data = np.concatenate([np.array([current_data['pressure_msl_current']]), pressure_levels_hpa])
             p_profile = np.sort(p_profile_data)[::-1].astype(np.float64) * units.hPa
             
+            # Zaman serisinden sadece ilk (en güncel) değeri al
             current_hourly_data = weather_df.iloc[0]
             temp_profile_data = np.concatenate([np.array([current_data['temperature_2m_current']]), np.array([current_hourly_data[f'temperature_{p}hPa'] for p in pressure_levels_hpa])])
             temp_profile = temp_profile_data.astype(np.float64) * units.degC
@@ -426,38 +429,25 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
                              path_effects=[pe.Stroke(linewidth=2, foreground='blue'), pe.Normal()])
 
             # Rüzgar Barb'ları
-            # Rüzgar hızları ve yönleri için ayrı profiller oluşturulmalı
-            # Bu kısım Open-Meteo'dan gelen 10m rüzgar ile sınırlı kalabilir veya diğer seviyelerden çekilmelidir.
-            # Şu an için sadece 1000hPa ve üstü rüzgar verileri mevcut.
-            
-            # Wind speed ve direction'ı birimlerle al
-            wind_speed_profile_data = np.array([current_hourly_data[f'wind_speed_{p}hPa'] for p in pressure_levels_hpa]) * units.meters / units.second
-            wind_direction_profile_data = np.array([current_hourly_data[f'wind_direction_{p}hPa'] for p in pressure_levels_hpa]) * units.degrees
-            
-            # 1000hPa altındaki ilk seviye için manuel rüzgar verisi ekleyelim
-            # Open-Meteo 10m wind_speed_10m ve wind_direction_10m sağlıyor, bunu başlangıç noktasına ekleyebiliriz.
-            
-            # Skew-T'ye barb çizimi
-            # Sadece pressure_levels_hpa için çizelim, current_data'daki 10m rüzgarı diyagramda göstermek için ayrıca ayarlama gerekebilir.
-            # Mevcut MetPy SkewT objesinde direkt pressure_profile'ın tamamı ile eşleşen bir rüzgar profili olmalı.
-            
-            # Basınç profili ve rüzgar profili boyutlarının eşleştiğinden emin olun
-            # Eğer 10m rüzgarı da ekleyeceksek, p_profile'a 10m seviyesinin basıncını ekleyip rüzgar_profilleri.append yapmalıyız.
-            
-            # Şimdilik sadece ana basınç seviyeleri için wind barb ekleyelim.
             wind_p_levels = pressure_levels_hpa * units.hPa
             
-            # Veri boyutlarını kontrol edin ve eşleştirin.
-            # Rüzgar verilerini MetPy'nin beklediği formata getirin.
-            if len(wind_speed_profile_data) == len(wind_direction_profile_data) == len(wind_p_levels):
-                 skew.plot_barbs(wind_p_levels, wind_speed_profile_data, wind_direction_profile_data, 
-                                 xloc=0.9, # Sağ kenara yakın bir yere yerleştirin
-                                 fill_empty_barb=True, 
-                                 sizes=dict(emptybarb=0.075, half=0.1, full=0.15, flag=0.15),
-                                 barb_kwargs={'color': 'purple', 'linewidth': 1.5})
-                 st.markdown("*(Sağ kenardaki mor oklar rüzgar yönü ve hızını göstermektedir.)*")
-            else:
-                 st.warning("Rüzgar barb'ları çizilemedi: Basınç ve rüzgar verisi boyutları eşleşmiyor.")
+            wind_speed_profile_data = np.array([current_hourly_data.get(f'wind_speed_{p}hPa') for p in pressure_levels_hpa])
+            wind_direction_profile_data = np.array([current_hourly_data.get(f'wind_direction_{p}hPa') for p in pressure_levels_hpa])
+
+            # NaN değerleri kontrol ederek MetPy'nin beklediği formata dönüştür
+            valid_indices = ~np.isnan(wind_speed_profile_data) & ~np.isnan(wind_direction_profile_data)
+            
+            if np.any(valid_indices):
+                valid_speeds = wind_speed_profile_data[valid_indices] * units.knots
+                valid_directions = wind_direction_profile_data[valid_indices] * units.degrees
+                valid_levels = wind_p_levels[valid_indices]
+                
+                skew.plot_barbs(valid_levels, valid_speeds, valid_directions, 
+                                xloc=0.9, # Sağ kenara yakın bir yere yerleştirin
+                                fill_empty_barb=False, # Eksik veriyi gösterme
+                                sizes=dict(emptybarb=0.075, half=0.1, full=0.15, flag=0.15),
+                                barb_kwargs={'color': 'purple', 'linewidth': 1.5})
+                st.markdown("*(Sağ kenardaki mor oklar rüzgar yönü ve hızını göstermektedir.)*")
 
 
             skew.ax.set_title(f'Skew-T Diyagramı (Konum: {user_lat:.2f}, {user_lon:.2f})', fontsize=16, weight='bold')

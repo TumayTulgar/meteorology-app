@@ -1,8 +1,10 @@
 streamlit
-metpy
-openmeteo-requests
-requests-cache
-retry-requests
 pandas
 numpy
 matplotlib
+metpy
+open-meteo-requests
+requests-cache
+retry-requests
+folium
+streamlit-folium

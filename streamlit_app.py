@@ -90,6 +90,18 @@ with col1:
 with col2:
     user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
 
+# --- Manuel Başlangıç Değerlerini Belirleme ---
+# API verisi henüz çekilmediği için varsayılan değerleri belirleyelim
+default_p_start = 1013.25
+default_t_start = 20.0
+default_td_start = 10.0
+
+with st.expander("Manuel Başlangıç Değerlerini Düzenle"):
+    st.info("Yükselen parselin başlangıç değerlerini manuel olarak değiştirebilirsiniz. Varsayılan değerler analizi başlatınca otomatik olarak güncellenecektir.")
+    p_start_manual = st.number_input("Parsel Başlangıç Basıncı (hPa)", value=default_p_start, step=0.1)
+    t_start_manual = st.number_input("Parsel Başlangıç Sıcaklığı (°C)", value=default_t_start, step=0.1)
+    td_start_manual = st.number_input("Parsel Başlangıç Çiğ Noktası (°C)", value=default_td_start, step=0.1)
+
 if st.button("Analiz Et"):
     st.markdown("---")
     st.info(f"Analiz için konum: **Enlem: {user_lat:.2f}°**, **Boylam: {user_lon:.2f}°**")
@@ -114,14 +126,7 @@ if st.button("Analiz Et"):
         
         dewpoint_profile = dewpoint_from_relative_humidity(temp_profile, relative_humidity_profile)
         
-        # --- Manuel Başlangıç Değerlerini Belirleme ---
-        with st.expander("Manuel Başlangıç Değerlerini Düzenle"):
-            st.info("Yükselen parselin başlangıç değerlerini manuel olarak değiştirebilirsiniz. Varsayılan değerler küresel modelden alınmıştır.")
-            p_start_manual = st.number_input("Parsel Başlangıç Basıncı (hPa)", value=current_data['pressure_msl_current'], step=0.1)
-            t_start_manual = st.number_input("Parsel Başlangıç Sıcaklığı (°C)", value=current_data['temperature_2m_current'], step=0.1)
-            td_start_manual = st.number_input("Parsel Başlangıç Çiğ Noktası (°C)", value=current_data['dew_point_2m_current'], step=0.1)
-
-        # --- Parsel verilerini birimlere dönüştürme ---
+        # --- Parsel verilerini birimlere dönüştürme (kullanıcının girdiği değerleri kullanıyoruz) ---
         p_start = p_start_manual * units.hPa
         t_start = t_start_manual * units.degC
         td_start = td_start_manual * units.degC

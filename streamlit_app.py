@@ -214,7 +214,7 @@ if st.button("Analiz Et"):
         # --- Skew-T Diyagramını Çizme ve Gösterme ---
         st.header("Skew-T Diyagramı")
         
-        fig = plt.figure(figsize=(10, 10))
+        fig = plt.figure(figsize=(20, 20))
         skew = SkewT(fig, rotation=45)
         
         # Çevresel atmosfer ve çiğ noktası çizimi
@@ -244,7 +244,7 @@ if st.button("Analiz Et"):
         skew.ax.set_xlabel('Sıcaklık (°C)', fontsize=12)
         skew.ax.set_ylabel('Basınç (hPa)', fontsize=12)
         skew.ax.legend()
-        skew.ax.set_ylim(1920, 1080)
+        skew.ax.set_ylim(1050, 100)
         skew.ax.set_xlim(-40, 40)
         
         st.pyplot(fig)

@@ -14,7 +14,7 @@ from metpy.plots import SkewT
 st.title("Atmosferik Parsel Simülasyonu ve Skew-T Analizi")
 st.markdown("Bir konumun güncel atmosferik profilini çekerek veya manuel veri girerek parsel simülasyonu ve termodinamik indeks analizi yapar.")
 
-# --- API'den Veri Çekme Fonksiyonu (Değişmedi) ---
+# --- API'den Veri Çekme Fonksiyonu ---
 @st.cache_data(ttl=3600)
 def get_weather_data(latitude: float, longitude: float) -> (pd.DataFrame, dict):
     try:

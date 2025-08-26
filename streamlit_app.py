@@ -10,6 +10,70 @@ from metpy.calc import (
 )
 from metpy.plots import SkewT
 
+# --- API İÇİN GEREKLİ KÜTÜPHANELER ---
+import requests
+import json
+
+def ask_gemini_api(data_to_analyze):
+    """
+    Belirtilen verileri kullanarak Gemini API'ye istek gönderir ve yanıtı döndürür.
+    Bu fonksiyon bir şablondur, API anahtarınızı buraya eklemeniz gerekmektedir.
+    """
+    
+    # GERÇEK API ANAHTARINIZI BURAYA EKLEYİN.
+    # UYARI: BU KODU GİTHUB'A GENEL OLARAK YÜKLERKEN ANAHTARINIZI SİLMEYİ UNUTMAYIN.
+    API_KEY = "AIzaSyCUoM1fEkw3JVfWfB78BMu25S2C3vQH8Bs"  
+    
+    # Gemini API'nin doğru endpoint'ini buraya yazın.
+    endpoint = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
+    
+    prompt = f"""
+    Aşağıdaki meteorolojik verileri analiz et ve bir cümlelik kısa bir yorum yap. 
+    Verilen tüm indeksleri (CAPE, CIN, LI, vb.) ve değerleri dikkate al. 
+    Meteorolojik bilgi düzeyi yüksek, fakat herkesin anlayabileceği şekilde, teknik terimlerden kaçınarak bir özet yaz.
+    
+    Veriler:
+    - Yüzey CAPE: {data_to_analyze['cape']:.2f} J/kg
+    - Yüzey CIN: {data_to_analyze['cin']:.2f} J/kg
+    - En Kararsız Parsel (MU-CAPE): {data_to_analyze['mu_cape']:.2f} J/kg
+    - Karışık Katman Parseli (ML-CAPE): {data_to_analyze['ml_cape']:.2f} J/kg
+    - LI (Yükselme İndeksi): {data_to_analyze['li']:.2f} Δ°C
+    - K-İndeksi: {data_to_analyze['k_index']:.2f} °C
+    """
+    
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
+    
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        response = requests.post(endpoint, headers=headers, data=json.dumps(payload))
+        response.raise_for_status() 
+        
+        result = response.json()
+        
+        # Yanıttan metin içeriğini çek
+        summary = result['candidates'][0]['content']['parts'][0]['text']
+        return summary
+    
+    except requests.exceptions.RequestException as e:
+        return f"API isteği sırasında bir hata oluştu: {e}"
+    except (KeyError, IndexError) as e:
+        return f"API yanıtı beklenenden farklı. Hata detayı: {e}"
+    except Exception as e:
+        return f"Genel bir hata oluştu: {e}"
+
 # --- Uygulama Başlığı ve Açıklaması ---
 st.title("Atmosferik Parsel Simülasyonu ve Skew-T Analizi")
 st.markdown("Bir konumun güncel atmosferik profilini çekerek ve dilerseniz başlangıç verilerini manuel olarak düzenleyerek analiz yapar.")
@@ -185,36 +249,31 @@ if st.button("Analiz Et"):
         st.write(f"**Karışık Katman Parseli (ML-CAPE):** {ml_cape:.2f~P}")
         st.write(f"**Yükselme İndeksi (LI):** {li:.2f~P}")
         st.write(f"**K-İndeksi:** {k_index_val:.2f~P}")
-
-        st.subheader("Meteorolojik Durum Özeti")
+        
+        # --- API İLE YORUMLAMA BÖLÜMÜNÜN YENİ KODU ---
+        st.subheader("Meteorolojik Durum Özeti (AI Destekli)")
         st.markdown("---")
         
-        # --- AI Benzeri Yorumlama ---
-        ozet_metni = ""
-        cape_joule = cape.to('J/kg').magnitude
-        cin_joule = cin.to('J/kg').magnitude
-        li_val = li.magnitude if li is not None else np.inf
-        k_index_val_mag = k_index_val.magnitude if k_index_val is not None else 0
-
-        if cape_joule > 1500 and cin_joule < 100 and li_val < -5:
-            ozet_metni = "**Hava Durumu Potansiyel Olarak Çok Şiddetli Fırtınalara Açık!** Atmosferde yüksek miktarda konvektif enerji birikmiş durumda ve konveksiyonu engelleyici bir katman bulunmuyor. Şiddetli sağanak, dolu ve kuvvetli rüzgarlar beklenebilir. **Çok dikkatli olunmalı!**"
-        elif cape_joule > 500 and cin_joule < 50 and li_val < -2:
-            ozet_metni = "**Fırtına Potansiyeli Yüksek!** Atmosfer kararsız ve yeterli konvektif enerji mevcut. Yerel olarak kuvvetli gök gürültülü sağanaklar ve hatta dolu görülebilir. Hava durumunu yakından takip edin."
-        elif cape_joule > 100 and cin_joule < 150 and k_index_val_mag > 25:
-            ozet_metni = "**Hafif ila Orta Dereceli Fırtına Potansiyeli.** Atmosferde bir miktar kararsızlık var ve sağanak olasılığı bulunuyor. Şiddetli fırtına riski düşük olsa da ani yerel sağanaklar olabilir."
-        elif cape_joule < 50 and cin_joule > 0 and li_val > 0:
-            ozet_metni = "**Genel Olarak Kararlı Atmosfer.** Konvektif enerji çok düşük ve atmosfer oldukça kararlı. Fırtına veya önemli bir yağış beklenmiyor."
-        else:
-            ozet_metni = "Mevcut meteorolojik verilerle ilgili spesifik bir yorum yapılamamaktadır. Ancak genel olarak atmosferik koşullar kararlı veya zayıf konvektif aktiviteye işaret etmektedir."
+        analysis_data = {
+            'cape': cape.to('J/kg').magnitude,
+            'cin': cin.to('J/kg').magnitude,
+            'mu_cape': mu_cape.to('J/kg').magnitude,
+            'ml_cape': ml_cape.to('J/kg').magnitude,
+            'li': li.magnitude if li is not None else 999,
+            'k_index': k_index_val.magnitude if k_index_val is not None else 999,
+        }
         
-        st.markdown(ozet_metni)
+        with st.spinner('Yapay zeka analiz yapıyor, lütfen bekleyin...'):
+            ai_yorum = ask_gemini_api(analysis_data)
+        
+        st.write(ai_yorum)
 
         st.markdown("---")
         
         # --- Skew-T Diyagramını Çizme ve Gösterme ---
         st.header("Skew-T Diyagramı")
         
-        fig = plt.figure(figsize=(14, 14))
+        fig = plt.figure(figsize=(14, 14)) # Diyagram boyutu büyütüldü
         skew = SkewT(fig, rotation=45)
         
         # Çevresel atmosfer ve çiğ noktası çizimi

@@ -259,14 +259,14 @@ if st.button("Analiz Et"):
         st.subheader("Meteorolojik Durum Özeti (AI Destekli)")
         st.markdown("---")
         
-        # TypeError ve ValueError'ı önlemek için değerleri kontrol ederek sözlüğü oluşturun
+        # Hataları önlemek için değerleri float'a dönüştürüp nan kontrolü yapıyoruz.
         analysis_data = {
-            'cape': cape.to('J/kg').magnitude if cape is not None and np.isfinite(cape.to('J/kg').magnitude) else np.nan,
-            'cin': cin.to('J/kg').magnitude if cin is not None and np.isfinite(cin.to('J/kg').magnitude) else np.nan,
-            'mu_cape': mu_cape.to('J/kg').magnitude if mu_cape is not None and np.isfinite(mu_cape.to('J/kg').magnitude) else np.nan,
-            'ml_cape': ml_cape.to('J/kg').magnitude if ml_cape is not None and np.isfinite(ml_cape.to('J/kg').magnitude) else np.nan,
-            'li': li.magnitude if li is not None and np.isfinite(li.magnitude) else np.nan,
-            'k_index': k_index_val.magnitude if k_index_val is not None and np.isfinite(k_index_val.magnitude) else np.nan,
+            'cape': float(cape.to('J/kg').magnitude) if cape is not None and np.isfinite(cape.to('J/kg').magnitude) else np.nan,
+            'cin': float(cin.to('J/kg').magnitude) if cin is not None and np.isfinite(cin.to('J/kg').magnitude) else np.nan,
+            'mu_cape': float(mu_cape.to('J/kg').magnitude) if mu_cape is not None and np.isfinite(mu_cape.to('J/kg').magnitude) else np.nan,
+            'ml_cape': float(ml_cape.to('J/kg').magnitude) if ml_cape is not None and np.isfinite(ml_cape.to('J/kg').magnitude) else np.nan,
+            'li': float(li.magnitude) if li is not None and np.isfinite(li.magnitude) else np.nan,
+            'k_index': float(k_index_val.magnitude) if k_index_val is not None and np.isfinite(k_index_val.magnitude) else np.nan,
         }
         
         with st.spinner('Yapay zeka analiz yapıyor, lütfen bekleyin...'):

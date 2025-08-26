@@ -14,6 +14,12 @@ from metpy.plots import SkewT
 import requests
 import json
 
+def get_value_for_api(metpy_obj):
+    """MetPy nesnesinden float değeri alır, yoksa np.nan döndürür."""
+    if metpy_obj is not None and np.isfinite(metpy_obj.magnitude):
+        return float(metpy_obj.magnitude)
+    return np.nan
+
 def ask_gemini_api(data_to_analyze):
     """
     Belirtilen verileri kullanarak Gemini API'ye istek gönderir ve yanıtı döndürür.
@@ -22,13 +28,11 @@ def ask_gemini_api(data_to_analyze):
     
     # GERÇEK API ANAHTARINIZI BURAYA EKLEYİN.
     # DİKKAT: BU KODU HERKESE AÇIK BİR PLATFORMA YÜKLERKEN ANAHTARINIZI GİZLEMEYİ UNUTMAYIN.
-    API_KEY = "AIzaSyCUoM1fEkw3JVfWfB78BMu25S2C3vQH8Bs"  
+    API_KEY = "SİZİN_GERÇEK_API_ANAHTARINIZ"  
     
-    # Gemini API'nin doğru endpoint'ini buraya yazın.
     endpoint = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
     
-    # Hata veren f-string bölümü güncellendi.
-    # Her bir değişkenin float olup olmadığı kontrol ediliyor.
+    # f-string içinde her bir değer için ayrı ayrı kontrol yapılıyor
     prompt = f"""
     Aşağıdaki meteorolojik verileri analiz et ve bir cümlelik kısa bir yorum yap. 
     Verilen tüm indeksleri (CAPE, CIN, LI, vb.) ve değerleri dikkate al. 
@@ -230,24 +234,33 @@ if st.button("Analiz Et"):
         li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
         k_index_val = k_index(p_profile, temp_profile, dewpoint_profile)
         
-        lcl_p, lcl_t = lcl(p_start, t_start, td_start)
-        lfc_p, lfc_t = lfc(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-        el_p, el_t = el(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-        
+        # Hata kontrolü için try-except blokları ekleyelim.
+        try:
+            lcl_p, lcl_t = lcl(p_start, t_start, td_start)
+        except Exception:
+            lcl_p, lcl_t = None, None
+            
+        try:
+            lfc_p, lfc_t = lfc(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
+        except Exception:
+            lfc_p, lfc_t = None, None
+            
+        try:
+            el_p, el_t = el(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
+        except Exception:
+            el_p, el_t = None, None
+            
         # --- Sonuçları Streamlit'te Gösterme ---
         st.header("Analiz Sonuçları")
         st.subheader("Parsel Simülasyonu ve Termodinamik Parametreler")
         st.write(f"**Yükselen Parselin Başlangıç Basıncı:** {p_start:.2f~P}")
         st.write(f"**Yükselen Parselin Başlangıç Sıcaklığı:** {t_start:.2f~P}")
         st.write(f"**Yükselen Parselin Başlangıç Çiğ Noktası:** {td_start:.2f~P}")
-        st.write(f"**Yükselme Yoğunlaşma Seviyesi (LCL) Basıncı:** {lcl_p.to('hPa'):.2f~P}")
+        st.write(f"**Yükselme Yoğunlaşma Seviyesi (LCL) Basıncı:** {'{:.2f~P}'.format(lcl_p.to('hPa')) if lcl_p is not None else 'Yok'}")
         
         st.subheader("Konvektif Seviyeler ve İndeksler")
-        st.write(f"**Serbest Konveksiyon Seviyesi (LFC) Basıncı:** {lfc_p.to('hPa'):.2f~P}")
-        if el_p is not None:
-             st.write(f"**Denge Seviyesi (EL) Basıncı:** {el_p.to('hPa'):.2f~P}")
-        else:
-             st.write(f"**Denge Seviyesi (EL) Basıncı:** Yok")
+        st.write(f"**Serbest Konveksiyon Seviyesi (LFC) Basıncı:** {'{:.2f~P}'.format(lfc_p.to('hPa')) if lfc_p is not None else 'Yok'}")
+        st.write(f"**Denge Seviyesi (EL) Basıncı:** {'{:.2f~P}'.format(el_p.to('hPa')) if el_p is not None else 'Yok'}")
         st.write(f"**Yüzeyden Yükselen Parsel için CAPE:** {cape:.2f~P}")
         st.write(f"**Yüzeyden Yükselen Parsel için CIN:** {cin:.2f~P}")
         st.write(f"**En Kararsız Parsel (MU-CAPE):** {mu_cape:.2f~P}")
@@ -261,12 +274,12 @@ if st.button("Analiz Et"):
         
         # Hataları önlemek için değerleri float'a dönüştürüp nan kontrolü yapıyoruz.
         analysis_data = {
-            'cape': float(cape.to('J/kg').magnitude) if cape is not None and np.isfinite(cape.to('J/kg').magnitude) else np.nan,
-            'cin': float(cin.to('J/kg').magnitude) if cin is not None and np.isfinite(cin.to('J/kg').magnitude) else np.nan,
-            'mu_cape': float(mu_cape.to('J/kg').magnitude) if mu_cape is not None and np.isfinite(mu_cape.to('J/kg').magnitude) else np.nan,
-            'ml_cape': float(ml_cape.to('J/kg').magnitude) if ml_cape is not None and np.isfinite(ml_cape.to('J/kg').magnitude) else np.nan,
-            'li': float(li.magnitude) if li is not None and np.isfinite(li.magnitude) else np.nan,
-            'k_index': float(k_index_val.magnitude) if k_index_val is not None and np.isfinite(k_index_val.magnitude) else np.nan,
+            'cape': get_value_for_api(cape.to('J/kg')),
+            'cin': get_value_for_api(cin.to('J/kg')),
+            'mu_cape': get_value_for_api(mu_cape.to('J/kg')),
+            'ml_cape': get_value_for_api(ml_cape.to('J/kg')),
+            'li': get_value_for_api(li),
+            'k_index': get_value_for_api(k_index_val),
         }
         
         with st.spinner('Yapay zeka analiz yapıyor, lütfen bekleyin...'):
@@ -279,24 +292,21 @@ if st.button("Analiz Et"):
         # --- Skew-T Diyagramını Çizme ve Gösterme ---
         st.header("Skew-T Diyagramı")
         
-        fig = plt.figure(figsize=(14, 14)) # Diyagram boyutu büyütüldü
+        fig = plt.figure(figsize=(14, 14))
         skew = SkewT(fig, rotation=45)
         
-        # Çevresel atmosfer ve çiğ noktası çizimi
         skew.plot(p_profile, temp_profile, 'r', linewidth=2, label='Atmosfer Sıcaklığı')
         skew.plot(p_profile, dewpoint_profile, 'g', linewidth=2, label='Atmosfer Çiğ Noktası')
-        
-        # Parsel yolu çizimi
         skew.plot(p_profile, parcel_temp_profile, 'k', linestyle='--', linewidth=2, label='Yükselen Parsel (Manuel Başlangıç)')
         
-        # Adyabatik ve karıştırma çizgileri
         skew.plot_dry_adiabats()
         skew.plot_moist_adiabats()
         skew.plot_mixing_lines()
         
-        # LCL, LFC, EL noktaları ve etiketleri
-        skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', markersize=8)
-        skew.ax.text(lcl_t.magnitude + 2, lcl_p.magnitude, 'LCL', fontsize=11, color='black', ha='left', va='center')
+        # Çizim ve etiketler için daha güvenilir kontrol
+        if lcl_p is not None and lcl_t is not None:
+            skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', markersize=8)
+            skew.ax.text(lcl_t.magnitude + 2, lcl_p.magnitude, 'LCL', fontsize=11, color='black', ha='left', va='center')
         
         if lfc_p is not None and lfc_t is not None:
             skew.plot(lfc_p, lfc_t, 'ro', markerfacecolor='red', markersize=8)

@@ -1,6 +1,178 @@
 import streamlit as st
-
-st.title("🎈 My new app")
-st.write(
-    "Let's start building! For help and inspiration, head over to [docs.streamlit.io](https://docs.streamlit.io/)."
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from metpy.units import units
+from metpy.calc import (
+    parcel_profile, cape_cin, lcl, lfc, el,
+    lifted_index, k_index, dewpoint_from_relative_humidity,
+    most_unstable_cape_cin, mixed_layer_cape_cin
 )
+from metpy.plots import SkewT
+
+# --- Uygulama Başlığı ve Açıklaması ---
+st.title("Atmosferik Parsel Simülasyonu ve Skew-T Analizi")
+st.markdown("Bir konumun güncel atmosferik profilini çekerek parsel simülasyonu ve termodinamik indeks analizi yapar.")
+
+# --- API'den Veri Çekme Fonksiyonu ---
+@st.cache_data(ttl=3600)  # Veriyi 1 saat boyunca önbelleğe alır
+def get_weather_data(latitude: float, longitude: float) -> (pd.DataFrame, dict):
+    """Belirtilen konum için tüm atmosferik profilleri ve güncel verileri API'den çeker."""
+    try:
+        import openmeteo_requests
+        import requests_cache
+        from retry_requests import retry
+        
+        cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
+        retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
+        openmeteo = openmeteo_requests.Client(session=retry_session)
+
+        url = "https://api.open-meteo.com/v1/forecast"
+        hourly_variables = [
+            "temperature_2m", "relative_humidity_2m", "dew_point_2m", "pressure_msl",
+            "surface_pressure",
+            "temperature_1000hPa", "relative_humidity_1000hPa", "wind_speed_1000hPa", "wind_direction_1000hPa", "geopotential_height_1000hPa",
+            "temperature_975hPa", "relative_humidity_975hPa", "wind_speed_975hPa", "wind_direction_975hPa", "geopotential_height_975hPa",
+            "temperature_950hPa", "relative_humidity_950hPa", "wind_speed_950hPa", "wind_direction_950hPa", "geopotential_height_950hPa",
+            "temperature_925hPa", "relative_humidity_925hPa", "wind_speed_925hPa", "wind_direction_925hPa", "geopotential_height_925hPa",
+            "temperature_900hPa", "relative_humidity_900hPa", "wind_speed_900hPa", "wind_direction_900hPa", "geopotential_height_900hPa",
+            "temperature_850hPa", "relative_humidity_850hPa", "wind_speed_850hPa", "wind_direction_850hPa", "geopotential_height_850hPa",
+            "temperature_800hPa", "relative_humidity_800hPa", "wind_speed_800hPa", "wind_direction_800hPa", "geopotential_height_800hPa",
+            "temperature_700hPa", "relative_humidity_700hPa", "wind_speed_700hPa", "wind_direction_700hPa", "geopotential_height_700hPa",
+            "temperature_600hPa", "relative_humidity_600hPa", "wind_speed_600hPa", "wind_direction_600hPa", "geopotential_height_600hPa",
+            "temperature_500hPa", "relative_humidity_500hPa", "wind_speed_500hPa", "wind_direction_500hPa", "geopotential_height_500hPa",
+            "temperature_400hPa", "relative_humidity_400hPa", "wind_speed_400hPa", "wind_direction_400hPa", "geopotential_height_400hPa",
+            "temperature_300hPa", "relative_humidity_300hPa", "wind_speed_300hPa", "wind_direction_300hPa", "geopotential_height_300hPa",
+            "temperature_250hPa", "relative_humidity_250hPa", "wind_speed_250hPa", "wind_direction_250hPa", "geopotential_height_250hPa",
+            "temperature_200hPa", "relative_humidity_200hPa", "wind_speed_200hPa", "wind_direction_200hPa", "geopotential_height_200hPa",
+            "temperature_150hPa", "relative_humidity_150hPa", "wind_speed_150hPa", "wind_direction_150hPa", "geopotential_height_150hPa",
+            "temperature_100hPa", "relative_humidity_100hPa", "wind_speed_100hPa", "wind_direction_100hPa", "geopotential_height_100hPa",
+            "temperature_70hPa", "relative_humidity_70hPa", "wind_speed_70hPa", "wind_direction_70hPa", "geopotential_height_70hPa",
+            "temperature_50hPa", "relative_humidity_50hPa", "wind_speed_50hPa", "wind_direction_50hPa", "geopotential_height_50hPa",
+            "temperature_30hPa", "relative_humidity_30hPa", "wind_speed_30hPa", "wind_direction_30hPa", "geopotential_height_30hPa",
+        ]
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "hourly": hourly_variables,
+            "current": ["temperature_2m", "relative_humidity_2m", "pressure_msl", "dew_point_2m", "wind_speed_10m", "wind_direction_10m"],
+            "timezone": "auto",
+            "forecast_days": 1,
+        }
+        
+        responses = openmeteo.weather_api(url, params=params)
+        hourly = responses[0].Hourly()
+        hourly_data = {}
+        for i, var_name in enumerate(hourly_variables):
+            hourly_data[var_name] = hourly.Variables(i).ValuesAsNumpy()
+        hourly_df = pd.DataFrame(data=hourly_data)
+        
+        current = responses[0].Current()
+        current_data = {
+            'pressure_msl_current': current.Variables(2).Value(),
+            'temperature_2m_current': current.Variables(0).Value(),
+            'dew_point_2m_current': current.Variables(3).Value(),
+            'relative_humidity_2m_current': current.Variables(1).Value(),
+            'wind_speed_10m_current': current.Variables(4).Value(),
+            'wind_direction_10m_current': current.Variables(5).Value(),
+        }
+        
+        return hourly_df, current_data
+
+    except Exception as e:
+        st.error(f"Hata: Veri çekilirken bir sorun oluştu. Lütfen enlem ve boylamı kontrol edin. Hata: {e}")
+        return pd.DataFrame(), {}
+        
+# --- Kullanıcıdan Enlem ve Boylam Girişi Alma ---
+col1, col2 = st.columns(2)
+with col1:
+    user_lat = st.number_input("Enlem (°)", value=40.90, format="%.2f")
+with col2:
+    user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
+
+if st.button("Analiz Et"):
+    st.markdown("---")
+    st.info(f"Analiz için konum: **Enlem: {user_lat:.2f}°**, **Boylam: {user_lon:.2f}°**")
+    
+    # 1. API'den veriyi çekin
+    weather_df, current_data = get_weather_data(user_lat, user_lon)
+    
+    if weather_df.empty:
+        st.warning("Veri çekilemedi, lütfen konum değerlerini kontrol edin.")
+    else:
+        # 2. Parsel profillerini oluşturma
+        pressure_levels_hpa = np.array([1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30])
+        p_profile_data = np.concatenate([np.array([current_data['pressure_msl_current']]), pressure_levels_hpa])
+        p_profile = np.sort(p_profile_data)[::-1].astype(np.float64) * units.hPa
+        
+        current_hourly_data = weather_df.iloc[0]
+        temp_profile_data = np.concatenate([np.array([current_data['temperature_2m_current']]), np.array([current_hourly_data[f'temperature_{p}hPa'] for p in pressure_levels_hpa])])
+        temp_profile = temp_profile_data.astype(np.float64) * units.degC
+        
+        relative_humidity_profile_data = np.concatenate([np.array([current_data['relative_humidity_2m_current']]), np.array([current_hourly_data[f'relative_humidity_{p}hPa'] for p in pressure_levels_hpa])])
+        relative_humidity_profile = relative_humidity_profile_data.astype(np.float64) * units.percent
+        
+        dewpoint_profile = dewpoint_from_relative_humidity(temp_profile, relative_humidity_profile)
+        
+        # 3. Parsel verilerini tanımlama
+        p_start = np.array([current_data['pressure_msl_current']]).astype(np.float64) * units.hPa
+        t_start = np.array([current_data['temperature_2m_current']]).astype(np.float64) * units.degC
+        td_start = np.array([current_data['dew_point_2m_current']]).astype(np.float64) * units.degC
+        
+        # 4. Parsel simülasyonu ve indeks hesaplamaları
+        parcel_temp_profile = parcel_profile(p_profile, t_start[0], td_start[0])
+        
+        cape, cin = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
+        mu_cape, mu_cin = most_unstable_cape_cin(p_profile, temp_profile, dewpoint_profile)
+        ml_cape, ml_cin = mixed_layer_cape_cin(p_profile, temp_profile, dewpoint_profile)
+        li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
+        k_index_val = k_index(p_profile, temp_profile, dewpoint_profile)
+        
+        lcl_p, lcl_t = lcl(p_start[0], t_start[0], td_start[0])
+        lfc_p, lfc_t = lfc(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
+        el_p, el_t = el(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
+        
+        # --- Sonuçları Streamlit'te Gösterme ---
+        st.header("Analiz Sonuçları")
+        st.subheader("Parsel Simülasyonu ve Termodinamik Parametreler")
+        st.write(f"**Yükselen Parselin Başlangıç Basıncı:** {p_start[0]:.2f~P}")
+        st.write(f"**Yükselen Parselin Başlangıç Sıcaklığı:** {t_start[0]:.2f~P}")
+        st.write(f"**Yükselen Parselin Başlangıç Çiğ Noktası:** {td_start[0]:.2f~P}")
+        st.write(f"**Yükselme Yoğunlaşma Seviyesi (LCL) Basıncı:** {lcl_p.to('hPa'):.2f~P}")
+        
+        st.subheader("Konvektif Seviyeler ve İndeksler")
+        st.write(f"**Serbest Konveksiyon Seviyesi (LFC) Basıncı:** {lfc_p.to('hPa'):.2f~P}")
+        st.write(f"**Denge Seviyesi (EL) Basıncı:** {el_p.to('hPa'):.2f~P}")
+        st.write(f"**Yüzeyden Yükselen Parsel için CAPE:** {cape:.2f~P}")
+        st.write(f"**Yüzeyden Yükselen Parsel için CIN:** {cin:.2f~P}")
+        st.write(f"**En Kararsız Parsel (MU-CAPE):** {mu_cape:.2f~P}")
+        st.write(f"**Karışık Katman Parseli (ML-CAPE):** {ml_cape:.2f~P}")
+        st.write(f"**Yükselme İndeksi (LI):** {li:.2f~P}")
+        st.write(f"**K-İndeksi:** {k_index_val:.2f~P}")
+        
+        # --- Skew-T Diyagramını Çizme ve Gösterme ---
+        st.header("Skew-T Diyagramı")
+        
+        fig = plt.figure(figsize=(10, 10))
+        skew = SkewT(fig, rotation=45)
+        
+        skew.plot(p_profile, temp_profile, 'r', linewidth=2, label='Atmosfer Sıcaklığı')
+        skew.plot(p_profile, dewpoint_profile, 'g', linewidth=2, label='Atmosfer Çiğ Noktası')
+        skew.plot(p_profile, parcel_temp_profile, 'k', linestyle='--', linewidth=2, label='Yükselen Parsel')
+        
+        skew.plot_dry_adiabats()
+        skew.plot_moist_adiabats()
+        skew.plot_mixing_lines()
+        
+        skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', markersize=8, label='LCL')
+        skew.plot(lfc_p, lfc_t, 'ro', markerfacecolor='red', markersize=8, label='LFC')
+        skew.plot(el_p, el_t, 'bo', markerfacecolor='blue', markersize=8, label='EL')
+        
+        skew.ax.set_title(f'Skew-T Diyagramı (Konum: {user_lat:.2f}, {user_lon:.2f})', fontsize=16)
+        skew.ax.set_xlabel(f'Sıcaklık (°C) / Yüzey Basıncı: {current_data["pressure_msl_current"]:.0f} hPa', fontsize=12)
+        skew.ax.set_ylabel('Basınç (hPa)', fontsize=12)
+        skew.ax.legend()
+        skew.ax.set_ylim(1050, 100)
+        skew.ax.set_xlim(-40, 40)
+        
+        st.pyplot(fig)

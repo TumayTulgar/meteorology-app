@@ -10,75 +10,97 @@ from metpy.calc import (
 )
 from metpy.plots import SkewT
 
-# --- API İÇİN GEREKLİ KÜTÜPHANELER ---
-import requests
-import json
+# --- API'Yİ KALDIRDIK VE YERİNE MANUEL BİR YORUMLAMA FONKSİYONU YAZIYORUZ ---
+def generate_meteorological_comment(analysis_data):
+    """
+    Verilen meteorolojik indekslere göre detaylı bir yorum metni oluşturur.
+    """
+    commentary = ""
 
-def get_value_for_api(metpy_obj):
+    # CAPE YORUMU
+    cape = analysis_data['cape']
+    if not np.isnan(cape):
+        if cape > 2500:
+            commentary += "## Yüksek Potansiyel Enerji\n"
+            commentary += f"**Yüzeyden Yükselen Parsel için CAPE ({cape:.2f} J/kg)** değeri oldukça yüksek. Bu, atmosferde önemli miktarda potansiyel enerji biriktiğini gösterir. Bu enerji, güçlü, hatta şiddetli fırtınaların gelişimini destekleyebilir.\n"
+        elif cape > 1000:
+            commentary += "## Orta Düzey Potansiyel Enerji\n"
+            commentary += f"**Yüzeyden Yükselen Parsel için CAPE ({cape:.2f} J/kg)** değeri orta düzeyde. Bu miktar, atmosferin kararsız olduğunu ve orta kuvvette fırtınalar oluşturma potansiyeli bulunduğunu gösterir.\n"
+        elif cape > 200:
+            commentary += "## Düşük Potansiyel Enerji\n"
+            commentary += f"**Yüzeyden Yükselen Parsel için CAPE ({cape:.2f} J/kg)** değeri düşüktür. Bu, kararsızlığın sınırlı olduğunu ve gelişecek herhangi bir fırtınanın zayıf olacağını gösterir.\n"
+        else:
+            commentary += "## Çok Düşük Potansiyel Enerji\n"
+            commentary += "Atmosferde biriken potansiyel enerji (CAPE) çok düşük veya sıfıra yakın. Bu koşullar, kararsızlığın olmadığı ve fırtına oluşumu için uygun olmadığı anlamına gelir.\n"
+    else:
+        commentary += "## Potansiyel Enerji Verisi Yok\n"
+        commentary += "Yüzeyden Yükselen Parsel için CAPE verisi bulunamadı. Atmosferik kararsızlık hakkında yorum yapmak mümkün değil.\n"
+    
+    commentary += "---\n"
+
+    # CIN YORUMU
+    cin = analysis_data['cin']
+    if not np.isnan(cin):
+        # CIN değerleri genellikle negatif olduğu için >= kullanıyoruz.
+        if cin >= -50:
+            commentary += "## Zayıf Bastırıcı Katman\n"
+            commentary += f"**CIN ({cin:.2f} J/kg)** değeri zayıf bir bastırıcı katman (inhibition) olduğunu gösteriyor. Bu durum, parselin yükselişinin kolayca başlayabileceği ve fırtına oluşumunun önünde ciddi bir engel bulunmadığı anlamına gelir.\n"
+        elif cin < -50 and cin >= -200:
+            commentary += "## Orta Kuvvette Bastırıcı Katman\n"
+            commentary += f"**CIN ({cin:.2f} J/kg)** değeri, orta kuvvette bir bastırıcı katman bulunduğunu gösteriyor. Fırtına oluşumunun başlayabilmesi için bu katmanın aşılması için güçlü bir tetikleyici (örneğin bir cephe veya ısı) gereklidir.\n"
+        else: # cin < -200
+            commentary += "## Çok Güçlü Bastırıcı Katman\n"
+            commentary += f"**CIN ({cin:.2f} J/kg)** değeri, atmosferde çok güçlü bir bastırıcı katman olduğunu gösterir. Bu katman, parselin yükselmesini engeller ve kararsızlığın ortaya çıkmasını zorlaştırır. Fırtına oluşumu ihtimali düşüktür.\n"
+    else:
+        commentary += "## Bastırıcı Katman Verisi Yok\n"
+        commentary += "Yüzeyden Yükselen Parsel için CIN verisi bulunamadı.\n"
+
+    commentary += "---\n"
+    
+    # LI YORUMU
+    li = analysis_data['li']
+    if not np.isnan(li):
+        if li < -3:
+            commentary += "## Yüksek Kararsızlık (LI)\n"
+            commentary += f"**LI ({li:.2f} °C)** değeri, atmosferin oldukça kararsız olduğunu ve kuvvetli konvektif olayların (şiddetli fırtınalar) mümkün olabileceğini gösterir.\n"
+        elif li >= -3 and li < 0:
+            commentary += "## Orta Kararsızlık (LI)\n"
+            commentary += f"**LI ({li:.2f} °C)** değeri, atmosferin orta derecede kararsız olduğunu ve orta kuvvette fırtına oluşumunun beklenebileceğini gösterir.\n"
+        elif li >= 0 and li < 3:
+            commentary += "## Zayıf Kararsızlık veya Kararlı (LI)\n"
+            commentary += f"**LI ({li:.2f} °C)** değeri, atmosferin kararlı veya çok hafif kararsız olduğunu gösterir. Fırtına oluşumu ihtimali düşüktür.\n"
+        else: # li >= 3
+            commentary += "## Kararlı Atmosfer (LI)\n"
+            commentary += "LI değeri pozitif ve yüksek. Bu durum, atmosferin kararlı olduğunu ve konvektif fırtına oluşumu için uygun olmadığını gösterir.\n"
+    else:
+        commentary += "## Yükselme İndeksi Verisi Yok\n"
+        commentary += "LI verisi bulunamadı.\n"
+        
+    commentary += "---\n"
+
+    # K-İNDEKSI YORUMU
+    k_index = analysis_data['k_index']
+    if not np.isnan(k_index):
+        if k_index > 35:
+            commentary += "## Yüksek Fırtına İhtimali (K-İndeksi)\n"
+            commentary += f"**K-İndeksi ({k_index:.2f} °C)** değeri, fırtına ihtimalinin yüksek olduğunu gösterir. Gök gürültülü sağanak yağışlar beklenebilir.\n"
+        elif k_index > 25:
+            commentary += "## Orta Fırtına İhtimali (K-İndeksi)\n"
+            commentary += f"**K-İndeksi ({k_index:.2f} °C)** değeri, fırtına ihtimalinin orta düzeyde olduğunu gösterir.\n"
+        else:
+            commentary += "## Düşük Fırtına İhtimali (K-İndeksi)\n"
+            commentary += f"**K-İndeksi ({k_index:.2f} °C)** değeri, fırtına ihtimalinin düşük olduğunu gösterir.\n"
+    else:
+        commentary += "## K-İndeksi Verisi Yok\n"
+        commentary += "K-İndeksi verisi bulunamadı.\n"
+        
+    return commentary
+
+def get_value_for_commentary(metpy_obj):
     """MetPy nesnesinden float değeri alır, yoksa np.nan döndürür."""
     if metpy_obj is not None and np.isfinite(metpy_obj.magnitude):
         return float(metpy_obj.magnitude)
     return np.nan
-
-def ask_gemini_api(data_to_analyze):
-    """
-    Belirtilen verileri kullanarak Gemini API'ye istek gönderir ve yanıtı döndürür.
-    Bu fonksiyon bir şablondur, API anahtarınızı buraya eklemeniz gerekmektedir.
-    """
-    
-    # GERÇEK API ANAHTARINIZI BURAYA EKLEYİN.
-    # DİKKAT: BU KODU HERKESE AÇIK BİR PLATFORMA YÜKLERKEN ANAHTARINIZI GİZLEMEYİ UNUTMAYIN.
-    API_KEY = "SİZİN_GERÇEK_API_ANAHTARINIZ"  
-    
-    endpoint = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
-    
-    # f-string içinde her bir değer için ayrı ayrı kontrol yapılıyor
-    prompt = f"""
-    Aşağıdaki meteorolojik verileri analiz et ve bir cümlelik kısa bir yorum yap. 
-    Verilen tüm indeksleri (CAPE, CIN, LI, vb.) ve değerleri dikkate al. 
-    Veriler 'nan' ise, o veri için yorum yapma.
-    Meteorolojik bilgi düzeyi yüksek, fakat herkesin anlayabileceği şekilde, teknik terimlerden kaçınarak bir özet yaz.
-    
-    Veriler:
-    - Yüzey CAPE: {data_to_analyze['cape']:.2f if not np.isnan(data_to_analyze['cape']) else 'Veri Yok'} J/kg
-    - Yüzey CIN: {data_to_analyze['cin']:.2f if not np.isnan(data_to_analyze['cin']) else 'Veri Yok'} J/kg
-    - En Kararsız Parsel (MU-CAPE): {data_to_analyze['mu_cape']:.2f if not np.isnan(data_to_analyze['mu_cape']) else 'Veri Yok'} J/kg
-    - Karışık Katman Parseli (ML-CAPE): {data_to_analyze['ml_cape']:.2f if not np.isnan(data_to_analyze['ml_cape']) else 'Veri Yok'} J/kg
-    - LI (Yükselme İndeksi): {data_to_analyze['li']:.2f if not np.isnan(data_to_analyze['li']) else 'Veri Yok'} Δ°C
-    - K-İndeksi: {data_to_analyze['k_index']:.2f if not np.isnan(data_to_analyze['k_index']) else 'Veri Yok'} °C
-    """
-    
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": prompt
-                    }
-                ]
-            }
-        ]
-    }
-    
-    headers = {
-        'Content-Type': 'application/json'
-    }
-    
-    try:
-        response = requests.post(endpoint, headers=headers, data=json.dumps(payload))
-        response.raise_for_status() 
-        
-        result = response.json()
-        
-        summary = result['candidates'][0]['content']['parts'][0]['text']
-        return summary
-    
-    except requests.exceptions.RequestException as e:
-        return f"API isteği sırasında bir hata oluştu: {e}"
-    except (KeyError, IndexError) as e:
-        return f"API yanıtı beklenenden farklı. Hata detayı: {e}"
-    except Exception as e:
-        return f"Genel bir hata oluştu: {e}"
 
 # --- Uygulama Başlığı ve Açıklaması ---
 st.title("Atmosferik Parsel Simülasyonu ve Skew-T Analizi")
@@ -268,24 +290,21 @@ if st.button("Analiz Et"):
         st.write(f"**Yükselme İndeksi (LI):** {li:.2f~P}")
         st.write(f"**K-İndeksi:** {k_index_val:.2f~P}")
         
-        # --- API İLE YORUMLAMA BÖLÜMÜ ---
-        st.subheader("Meteorolojik Durum Özeti (AI Destekli)")
+        # --- Kendi Meteorolojik Yorum Fonksiyonumuz ---
+        st.subheader("Meteorolojik Durum Özeti (Manuel Analiz)")
         st.markdown("---")
         
-        # Hataları önlemek için değerleri float'a dönüştürüp nan kontrolü yapıyoruz.
         analysis_data = {
-            'cape': get_value_for_api(cape.to('J/kg')),
-            'cin': get_value_for_api(cin.to('J/kg')),
-            'mu_cape': get_value_for_api(mu_cape.to('J/kg')),
-            'ml_cape': get_value_for_api(ml_cape.to('J/kg')),
-            'li': get_value_for_api(li),
-            'k_index': get_value_for_api(k_index_val),
+            'cape': get_value_for_commentary(cape.to('J/kg')),
+            'cin': get_value_for_commentary(cin.to('J/kg')),
+            'mu_cape': get_value_for_commentary(mu_cape.to('J/kg')),
+            'ml_cape': get_value_for_commentary(ml_cape.to('J/kg')),
+            'li': get_value_for_commentary(li),
+            'k_index': get_value_for_commentary(k_index_val),
         }
         
-        with st.spinner('Yapay zeka analiz yapıyor, lütfen bekleyin...'):
-            ai_yorum = ask_gemini_api(analysis_data)
-        
-        st.write(ai_yorum)
+        meteorological_comment = generate_meteorological_comment(analysis_data)
+        st.markdown(meteorological_comment)
 
         st.markdown("---")
         
@@ -303,7 +322,6 @@ if st.button("Analiz Et"):
         skew.plot_moist_adiabats()
         skew.plot_mixing_lines()
         
-        # Çizim ve etiketler için daha güvenilir kontrol
         if lcl_p is not None and lcl_t is not None:
             skew.plot(lcl_p, lcl_t, 'ko', markerfacecolor='black', markersize=8)
             skew.ax.text(lcl_t.magnitude + 2, lcl_p.magnitude, 'LCL', fontsize=11, color='black', ha='left', va='center')

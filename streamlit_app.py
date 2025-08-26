@@ -27,7 +27,8 @@ def ask_gemini_api(data_to_analyze):
     # Gemini API'nin doğru endpoint'ini buraya yazın.
     endpoint = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
     
-    # Prompt'ta değerlerin kontrolü yapılıyor.
+    # Hata veren f-string bölümü güncellendi.
+    # Her bir değişkenin float olup olmadığı kontrol ediliyor.
     prompt = f"""
     Aşağıdaki meteorolojik verileri analiz et ve bir cümlelik kısa bir yorum yap. 
     Verilen tüm indeksleri (CAPE, CIN, LI, vb.) ve değerleri dikkate al. 
@@ -258,12 +259,12 @@ if st.button("Analiz Et"):
         st.subheader("Meteorolojik Durum Özeti (AI Destekli)")
         st.markdown("---")
         
-        # TypeError'ı önlemek için değerleri kontrol ederek sözlüğü oluşturun
+        # TypeError ve ValueError'ı önlemek için değerleri kontrol ederek sözlüğü oluşturun
         analysis_data = {
-            'cape': cape.to('J/kg').magnitude,
-            'cin': cin.to('J/kg').magnitude,
-            'mu_cape': mu_cape.to('J/kg').magnitude,
-            'ml_cape': ml_cape.to('J/kg').magnitude,
+            'cape': cape.to('J/kg').magnitude if cape is not None and np.isfinite(cape.to('J/kg').magnitude) else np.nan,
+            'cin': cin.to('J/kg').magnitude if cin is not None and np.isfinite(cin.to('J/kg').magnitude) else np.nan,
+            'mu_cape': mu_cape.to('J/kg').magnitude if mu_cape is not None and np.isfinite(mu_cape.to('J/kg').magnitude) else np.nan,
+            'ml_cape': ml_cape.to('J/kg').magnitude if ml_cape is not None and np.isfinite(ml_cape.to('J/kg').magnitude) else np.nan,
             'li': li.magnitude if li is not None and np.isfinite(li.magnitude) else np.nan,
             'k_index': k_index_val.magnitude if k_index_val is not None and np.isfinite(k_index_val.magnitude) else np.nan,
         }

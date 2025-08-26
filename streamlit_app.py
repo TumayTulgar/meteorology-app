@@ -110,20 +110,20 @@ if not weather_df.empty:
                                     min_value=-50.0, 
                                     max_value=50.0, 
                                     value=current_data['temperature_2m_current'], 
-                                    step=0.5)
+                                    step=0.1)
         
         # Çiğ noktası sıcaklıktan büyük olamaz
         td_start_manual = st.slider("Parsel Başlangıç Çiğ Noktası (°C)", 
                                     min_value=-50.0, 
                                     max_value=t_start_manual, 
                                     value=current_data['dew_point_2m_current'], 
-                                    step=0.5)
+                                    step=0.1)
         
         p_start_manual = st.slider("Parsel Başlangıç Basıncı (hPa)", 
                                     min_value=980.0, 
                                     max_value=1050.0, 
                                     value=current_data['pressure_msl_current'], 
-                                    step=1.0)
+                                    step=0.5)
 else:
     st.warning("Veri çekilemedi. Manuel girişler için lütfen konum verilerini kontrol edin.")
     t_start_manual, td_start_manual, p_start_manual = 20.0, 10.0, 1013.25

@@ -90,26 +90,7 @@ with col1:
 with col2:
     user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
 
-# --- Manuel Başlangıç Değerlerini Belirleme (st.slider kullanılarak) ---
-with st.expander("Manuel Başlangıç Değerlerini Düzenle"):
-    st.info("Yükselen parselin başlangıç değerlerini kaydırıcıları kullanarak seçin.")
-    
-    p_start_manual = st.slider("Parsel Başlangıç Basıncı (hPa)", 
-                                min_value=980.0, 
-                                max_value=1050.0, 
-                                value=1013.25, 
-                                step=1.0)
-    t_start_manual = st.slider("Parsel Başlangıç Sıcaklığı (°C)", 
-                                min_value=-50.0, 
-                                max_value=50.0, 
-                                value=20.0, 
-                                step=0.5)
-    td_start_manual = st.slider("Parsel Başlangıç Çiğ Noktası (°C)", 
-                                 min_value=-50.0, 
-                                 max_value=50.0, 
-                                 value=10.0, 
-                                 step=0.5)
-
+# --- Analiz Et butonu
 if st.button("Analiz Et"):
     st.markdown("---")
     st.info(f"Analiz için konum: **Enlem: {user_lat:.2f}°**, **Boylam: {user_lon:.2f}°**")
@@ -120,6 +101,38 @@ if st.button("Analiz Et"):
     if weather_df.empty:
         st.warning("Veri çekilemedi, lütfen konum değerlerini kontrol edin.")
     else:
+        # --- Manuel Başlangıç Değerlerini Belirleme (st.slider kullanılarak) ---
+        with st.expander("Manuel Başlangıç Değerlerini Düzenle"):
+            st.info("Yükselen parselin başlangıç değerlerini kaydırıcıları kullanarak seçin.")
+            
+            # Küresel modelden gelen değerleri göster
+            st.write(f"**Küresel modelden gelen değerler:**")
+            st.write(f"  - Basınç: **{current_data['pressure_msl_current']:.2f} hPa**")
+            st.write(f"  - Sıcaklık: **{current_data['temperature_2m_current']:.2f} °C**")
+            st.write(f"  - Çiğ Noktası: **{current_data['dew_point_2m_current']:.2f} °C**")
+            
+            st.markdown("---")
+            
+            # Kullanıcının düzenleyeceği sliderlar
+            t_start_manual = st.slider("Parsel Başlangıç Sıcaklığı (°C)", 
+                                        min_value=-50.0, 
+                                        max_value=50.0, 
+                                        value=current_data['temperature_2m_current'], 
+                                        step=0.5)
+            
+            # Çiğ noktası sıcaklıktan büyük olamaz
+            td_start_manual = st.slider("Parsel Başlangıç Çiğ Noktası (°C)", 
+                                        min_value=-50.0, 
+                                        max_value=t_start_manual, 
+                                        value=current_data['dew_point_2m_current'], 
+                                        step=0.5)
+            
+            p_start_manual = st.slider("Parsel Başlangıç Basıncı (hPa)", 
+                                        min_value=980.0, 
+                                        max_value=1050.0, 
+                                        value=current_data['pressure_msl_current'], 
+                                        step=1.0)
+            
         # 2. Atmosferik profilleri oluşturma
         pressure_levels_hpa = np.array([1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30])
         p_profile_data = np.concatenate([np.array([current_data['pressure_msl_current']]), pressure_levels_hpa])

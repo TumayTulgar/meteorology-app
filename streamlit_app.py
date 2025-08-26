@@ -10,15 +10,11 @@ from metpy.calc import (
 )
 from metpy.plots import SkewT
 import matplotlib.patheffects as pe
-
-# API'yi manuel olarak çağırmak için
 import requests
 
-# Harita için gerekli
 import folium
 from streamlit_folium import folium_static
 
-# --- Yorumlama Fonksiyonu ---
 def generate_meteorological_comment(analysis_data):
     """
     Verilen meteorolojik indekslere göre detaylı bir yorum metni oluşturur.
@@ -28,7 +24,6 @@ def generate_meteorological_comment(analysis_data):
     commentary.append("## ☁️ Meteorolojik Analiz Özeti ☁️\n")
     commentary.append("---")
 
-    # CAPE YORUMU
     cape = analysis_data['cape']
     if not np.isnan(cape):
         commentary.append(f"### Konvektif Potansiyel Enerji (CAPE): `{cape:.2f} J/kg`")
@@ -50,7 +45,6 @@ def generate_meteorological_comment(analysis_data):
     
     commentary.append("\n---")
 
-    # CIN YORUMU
     cin = analysis_data['cin']
     if not np.isnan(cin):
         commentary.append(f"### Konvektif Engelleme (CIN): `{cin:.2f} J/kg`")
@@ -60,7 +54,7 @@ def generate_meteorological_comment(analysis_data):
         elif cin < -50 and cin >= -200:
             commentary.append("- **Durum:** Orta Kuvvette Bastırıcı Katman ⚠️")
             commentary.append("- **Anlamı:** Fırtına oluşumu için atmosferde bir miktar engelleyici katman var. Bir parselin bu katmanı aşarak yükselebilmesi için güçlü bir tetikleyici mekanizma (örneğin ısınma, cephe geçişi) gereklidir.")
-        else: # cin < -200
+        else:
             commentary.append("- **Durum:** Çok Güçlü Bastırıcı Katman 🚫")
             commentary.append("- **Anlamı:** Atmosferde konveksiyonu (dikey hava hareketini) ciddi şekilde engelleyen çok güçlü bir katman bulunmaktadır. Bu koşullar altında fırtına oluşumu çok zordur.")
     else:
@@ -69,7 +63,6 @@ def generate_meteorological_comment(analysis_data):
 
     commentary.append("\n---")
     
-    # LI YORUMU
     li = analysis_data['li']
     if not np.isnan(li):
         commentary.append(f"### Yükselme İndeksi (LI): `{li:.2f} °C`")
@@ -82,7 +75,7 @@ def generate_meteorological_comment(analysis_data):
         elif li >= 0 and li < 3:
             commentary.append("- **Durum:** Zayıf Kararsızlık veya Kararlı 💧")
             commentary.append("- **Anlamı:** Atmosfer kararlıdır veya çok hafif kararsızdır. Fırtına oluşumu ihtimali düşüktür.")
-        else: # li >= 3
+        else:
             commentary.append("- **Durum:** Kararlı Atmosfer 🌬️")
             commentary.append("- **Anlamı:** Atmosfer kararlıdır. Konvektif fırtına oluşumu için uygun değildir.")
     else:
@@ -91,7 +84,6 @@ def generate_meteorological_comment(analysis_data):
         
     commentary.append("\n---")
 
-    # K-İNDEKSI YORUMU
     k_index = analysis_data['k_index']
     if not np.isnan(k_index):
         commentary.append(f"### K-İndeksi: `{k_index:.2f} °C`")
@@ -112,19 +104,17 @@ def generate_meteorological_comment(analysis_data):
 
 def get_value_for_commentary(metpy_obj):
     """MetPy nesnesinden float değeri alır, yoksa np.nan döndürür."""
-    if metpy_obj is not None and np.isfinite(metpy_obj.magnitude):
+    if metpy_obj is not None and hasattr(metpy_obj, 'magnitude') and np.isfinite(metpy_obj.magnitude):
         return float(metpy_obj.magnitude)
     return np.nan
 
-# --- Streamlit Sayfa Yapılandırması ---
 st.set_page_config(
     page_title="Meteoroloji Analiz Uygulaması",
     page_icon="⛈️",
-    layout="wide", # Geniş düzen
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- Uygulama Başlığı ve Açıklaması ---
 st.title("⛈️ Atmosferik Parsel Simülasyonu ve Skew-T Analizi")
 st.markdown("""
 Bu uygulama, belirli bir coğrafi konum için anlık atmosferik profil verilerini **Open-Meteo API**'den çekerek meteorolojik analizler sunar. 
@@ -133,7 +123,6 @@ atmosferik kararlılık indeksleri (CAPE, CIN, LI, K-İndeksi) ile **Skew-T Log-
 """)
 st.markdown("---")
 
-# --- Yan Panel (Sidebar) için Girişler ---
 st.sidebar.header("📍 Konum Bilgileri")
 user_lat = st.sidebar.number_input("Enlem (°)", value=40.90, format="%.2f", key="sidebar_lat")
 user_lon = st.sidebar.number_input("Boylam (°)", value=27.47, format="%.2f", key="sidebar_lon")
@@ -141,8 +130,6 @@ user_lon = st.sidebar.number_input("Boylam (°)", value=27.47, format="%.2f", ke
 st.sidebar.markdown("---")
 st.sidebar.markdown("© 2023 Meteoroloji Uygulaması")
 
-
-# --- API'den Veri Çekme Fonksiyonu (Manuel Requests ile) ---
 @st.cache_data(ttl=3600)
 def get_weather_data(latitude: float, longitude: float) -> (pd.DataFrame, dict):
     try:
@@ -178,19 +165,17 @@ def get_weather_data(latitude: float, longitude: float) -> (pd.DataFrame, dict):
         }
         
         response = requests.get(url, params=params)
-        response.raise_for_status()  # Hata varsa istisna fırlatır
+        response.raise_for_status()
         data = response.json()
 
         hourly_data = data.get('hourly', {})
         current_data_raw = data.get('current', {})
 
-        # Zaman serisi verilerini DataFrame'e dönüştür
         if not hourly_data or 'time' not in hourly_data:
             return pd.DataFrame(), {}
             
         hourly_df = pd.DataFrame(hourly_data)
         
-        # Güncel verileri dictionary'ye al
         current_data = {
             'pressure_msl_current': current_data_raw.get('pressure_msl'),
             'temperature_2m_current': current_data_raw.get('temperature_2m'),
@@ -209,20 +194,16 @@ def get_weather_data(latitude: float, longitude: float) -> (pd.DataFrame, dict):
         st.error(f"Genel bir hata oluştu: {e}")
         return pd.DataFrame(), {}
 
-# --- Harita Gösterimi ---
 st.subheader(f"Harita üzerinde konum: Tekirdağ, Tekirdağ, Türkiye ({user_lat:.2f}°, {user_lon:.2f}°)")
 m = folium.Map(location=[user_lat, user_lon], zoom_start=10)
 folium.Marker([user_lat, user_lon], 
               tooltip=f"Lat: {user_lat:.2f}, Lon: {user_lon:.2f}",
               icon=folium.Icon(color='red', icon='cloud')).add_to(m)
-folium_static(m, width=700, height=300) # Harita boyutunu ayarlayabilirsiniz.
+folium_static(m, width=700, height=300)
 
-
-# API'den veriyi çekin (Bu kısım butonun dışına alındı)
 weather_df, current_data = get_weather_data(user_lat, user_lon)
 
 if not weather_df.empty and all(v is not None for v in current_data.values()):
-    # --- Anlık Hava Durumu Metrikleri ---
     st.subheader("Anlık Hava Durumu Bilgileri")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -237,7 +218,6 @@ if not weather_df.empty and all(v is not None for v in current_data.values()):
     with st.expander("🛠️ Manuel Başlangıç Değerlerini Düzenle", expanded=True):
         st.info("Yükselen parselin başlangıç değerlerini kaydırıcıları kullanarak seçin.")
         
-        # Kullanıcının düzenleyeceği sliderlar
         t_start_manual = st.slider("Parsel Başlangıç Sıcaklığı (°C)", 
                                     min_value=-50.0, 
                                     max_value=50.0, 
@@ -246,7 +226,7 @@ if not weather_df.empty and all(v is not None for v in current_data.values()):
         
         td_start_manual = st.slider("Parsel Başlangıç Çiğ Noktası (°C)", 
                                     min_value=-50.0, 
-                                    max_value=t_start_manual, # Çiğ noktası sıcaklıktan büyük olamaz
+                                    max_value=t_start_manual,
                                     value=current_data['dew_point_2m_current'], 
                                     step=0.1, key="td_start_manual")
         
@@ -257,7 +237,6 @@ if not weather_df.empty and all(v is not None for v in current_data.values()):
                                     step=0.5, key="p_start_manual")
 else:
     st.warning("Veri çekilemedi. Manuel girişler için lütfen konum verilerini kontrol edin veya 'Analiz Et' butonuna basmadan önce API'den veri gelmesini bekleyin.")
-    # Varsayılan değerler
     t_start_manual, td_start_manual, p_start_manual = 20.0, 10.0, 1013.25
 
 st.markdown("---")
@@ -266,34 +245,29 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
         st.error("Analiz için hava durumu verisi bulunamadı. Lütfen geçerli bir konum girdiğinizden emin olun.")
     else:
         with st.spinner('Atmosferik veriler analiz ediliyor, lütfen bekleyin...'):
-            # 2. Atmosferik profilleri oluşturma
             pressure_levels_hpa = np.array([1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30])
             p_profile_data = np.concatenate([np.array([current_data['pressure_msl_current']]), pressure_levels_hpa])
             p_profile = np.sort(p_profile_data)[::-1].astype(np.float64) * units.hPa
             
-            # Zaman serisinden sadece ilk (en güncel) değeri al
             current_hourly_data = weather_df.iloc[0]
-            temp_profile_data = np.concatenate([np.array([current_data['temperature_2m_current']]), np.array([current_hourly_data[f'temperature_{p}hPa'] for p in pressure_levels_hpa])])
+            temp_profile_data = np.concatenate([np.array([current_data['temperature_2m_current']]), np.array([current_hourly_data.get(f'temperature_{p}hPa') for p in pressure_levels_hpa])])
             temp_profile = temp_profile_data.astype(np.float64) * units.degC
             
-            relative_humidity_profile_data = np.concatenate([np.array([current_data['relative_humidity_2m_current']]), np.array([current_hourly_data[f'relative_humidity_{p}hPa'] for p in pressure_levels_hpa])])
+            relative_humidity_profile_data = np.concatenate([np.array([current_data['relative_humidity_2m_current']]), np.array([current_hourly_data.get(f'relative_humidity_{p}hPa') for p in pressure_levels_hpa])])
             relative_humidity_profile = relative_humidity_profile_data.astype(np.float64) * units.percent
             
             dewpoint_profile = dewpoint_from_relative_humidity(temp_profile, relative_humidity_profile)
             
-            # --- Parsel verilerini birimlere dönüştürme (kullanıcının girdiği değerleri kullanıyoruz) ---
             p_start = p_start_manual * units.hPa
             t_start = t_start_manual * units.degC
             td_start = td_start_manual * units.degC
             
-            # 4. Parsel simülasyonu ve indeks hesaplamaları
             parcel_temp_profile = parcel_profile(p_profile, t_start, td_start)
             
-            # MetPy hesaplamalarında olası None dönüşlerini yakalamak için daha güvenli yaklaşımlar
             try:
                 cape, cin = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
-                if cape.size == 0: cape = np.array([np.nan]) * units.J/units.kg # Boş array dönüşü için
-                if cin.size == 0: cin = np.array([np.nan]) * units.J/units.kg # Boş array dönüşü için
+                if cape.size == 0: cape = np.array([np.nan]) * units.J/units.kg
+                if cin.size == 0: cin = np.array([np.nan]) * units.J/units.kg
             except Exception:
                 cape, cin = np.array([np.nan]) * units.J/units.kg, np.array([np.nan]) * units.J/units.kg
 
@@ -340,10 +314,8 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             
             st.success("Analiz tamamlandı!")
 
-            # --- Sonuçları Streamlit'te Gösterme ---
             st.header("📊 Analiz Sonuçları ve Parametreler")
             
-            # Parsel Bilgileri
             st.subheader("💧 Yükselen Parsel Bilgileri")
             st.markdown(f"- **Başlangıç Basıncı:** `{p_start:.2f~P}`")
             st.markdown(f"- **Başlangıç Sıcaklığı:** `{t_start:.2f~P}`")
@@ -353,30 +325,28 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             st.markdown(f"- **Serbest Konveksiyon Seviyesi (LFC):** `{'{:.2f~P}'.format(lfc_p.to('hPa')) if lfc_p is not None else 'Yok'}`")
             st.markdown(f"- **Denge Seviyesi (EL):** `{'{:.2f~P}'.format(el_p.to('hPa')) if el_p is not None else 'Yok'}`")
 
-            # İndeksler Tablosu
             st.subheader("📈 Atmosferik Kararlılık İndeksleri")
             index_data = {
                 "İndeks": ["CAPE", "CIN", "MU-CAPE", "ML-CAPE", "LI", "K-İndeksi"],
                 "Değer": [
-                    f"{cape.to('J/kg').magnitude:.2f} J/kg" if not np.isnan(cape.to('J/kg').magnitude) else "Yok",
-                    f"{cin.to('J/kg').magnitude:.2f} J/kg" if not np.isnan(cin.to('J/kg').magnitude) else "Yok",
-                    f"{mu_cape.to('J/kg').magnitude:.2f} J/kg" if not np.isnan(mu_cape.to('J/kg').magnitude) else "Yok",
-                    f"{ml_cape.to('J/kg').magnitude:.2f} J/kg" if not np.isnan(ml_cape.to('J/kg').magnitude) else "Yok",
-                    f"{li.magnitude:.2f} °C" if not np.isnan(li.magnitude) else "Yok",
-                    f"{k_index_val.magnitude:.2f} °C" if not np.isnan(k_index_val.magnitude) else "Yok",
+                    f"{get_value_for_commentary(cape.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(cape.to('J/kg'))) else "Yok",
+                    f"{get_value_for_commentary(cin.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(cin.to('J/kg'))) else "Yok",
+                    f"{get_value_for_commentary(mu_cape.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(mu_cape.to('J/kg'))) else "Yok",
+                    f"{get_value_for_commentary(ml_cape.to('J/kg')):.2f} J/kg" if not np.isnan(get_value_for_commentary(ml_cape.to('J/kg'))) else "Yok",
+                    f"{get_value_for_commentary(li):.2f} °C" if not np.isnan(get_value_for_commentary(li)) else "Yok",
+                    f"{get_value_for_commentary(k_index_val):.2f} °C" if not np.isnan(get_value_for_commentary(k_index_val)) else "Yok",
                 ]
             }
-            st.table(pd.DataFrame(index_data)) # st.dataframe yerine st.table daha basit görünüyor
+            st.table(pd.DataFrame(index_data))
 
-            # --- Kendi Meteorolojik Yorum Fonksiyonumuz ---
             st.subheader("🗣️ Detaylı Meteorolojik Yorum")
             st.markdown("---")
             
             analysis_data_for_commentary = {
-                'cape': get_value_for_commentary(cape.to('J/kg')),
-                'cin': get_value_for_commentary(cin.to('J/kg')),
-                'mu_cape': get_value_for_commentary(mu_cape.to('J/kg')),
-                'ml_cape': get_value_for_commentary(ml_cape.to('J/kg')),
+                'cape': get_value_for_commentary(cape),
+                'cin': get_value_for_commentary(cin),
+                'mu_cape': get_value_for_commentary(mu_cape),
+                'ml_cape': get_value_for_commentary(ml_cape),
                 'li': get_value_for_commentary(li),
                 'k_index': get_value_for_commentary(k_index_val),
             }
@@ -386,30 +356,24 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
 
             st.markdown("---")
             
-            # --- Skew-T Diyagramını Çizme ve Gösterme ---
             st.header("📉 Skew-T Log-P Diyagramı")
             st.markdown("Atmosferik sıcaklık, çiğ noktası ve parsel yolunu gösteren termodinamik diyagram.")
             
-            fig = plt.figure(figsize=(12, 12)) # Diyagram boyutu ayarlandı
+            fig = plt.figure(figsize=(12, 12))
             skew = SkewT(fig, rotation=45)
             
-            # Çevresel atmosfer ve çiğ noktası çizimi
             skew.plot(p_profile, temp_profile, 'red', linewidth=2.5, linestyle='-', label='Atmosfer Sıcaklığı',
                       path_effects=[pe.Stroke(linewidth=3.5, foreground='black'), pe.Normal()])
             skew.plot(p_profile, dewpoint_profile, 'green', linewidth=2.5, linestyle='-', label='Atmosfer Çiğ Noktası',
                       path_effects=[pe.Stroke(linewidth=3.5, foreground='black'), pe.Normal()])
             
-            # Parsel yolu çizimi
             skew.plot(p_profile, parcel_temp_profile, 'blue', linestyle='--', linewidth=2, label='Yükselen Parsel (Manuel Başlangıç)',
                       path_effects=[pe.Stroke(linewidth=3, foreground='gray'), pe.Normal()])
             
-            # Adyabatik ve karıştırma çizgileri
             skew.plot_dry_adiabats(color='gray', linestyle=':', alpha=0.5)
             skew.plot_moist_adiabats(color='darkgreen', linestyle=':', alpha=0.5)
             skew.plot_mixing_lines(color='brown', linestyle=':', alpha=0.5)
             
-            # LCL, LFC, EL noktaları ve etiketleri
-            # Etiketler için arka plan gölgeleri eklendi
             if lcl_p is not None and lcl_t is not None:
                 skew.plot(lcl_p, lcl_t, 'o', markerfacecolor='black', markeredgecolor='white', markersize=8)
                 skew.ax.text(lcl_t.magnitude + 1, lcl_p.magnitude, 'LCL', 
@@ -428,13 +392,10 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
                              fontsize=11, color='white', ha='left', va='center',
                              path_effects=[pe.Stroke(linewidth=2, foreground='blue'), pe.Normal()])
 
-            # Rüzgar Barb'ları
             wind_p_levels = pressure_levels_hpa * units.hPa
-            
             wind_speed_profile_data = np.array([current_hourly_data.get(f'wind_speed_{p}hPa') for p in pressure_levels_hpa])
             wind_direction_profile_data = np.array([current_hourly_data.get(f'wind_direction_{p}hPa') for p in pressure_levels_hpa])
 
-            # NaN değerleri kontrol ederek MetPy'nin beklediği formata dönüştür
             valid_indices = ~np.isnan(wind_speed_profile_data) & ~np.isnan(wind_direction_profile_data)
             
             if np.any(valid_indices):
@@ -443,21 +404,19 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
                 valid_levels = wind_p_levels[valid_indices]
                 
                 skew.plot_barbs(valid_levels, valid_speeds, valid_directions, 
-                                xloc=0.9, # Sağ kenara yakın bir yere yerleştirin
-                                fill_empty_barb=False, # Eksik veriyi gösterme
+                                xloc=0.9,
+                                fill_empty_barb=False,
                                 sizes=dict(emptybarb=0.075, half=0.1, full=0.15, flag=0.15),
                                 barb_kwargs={'color': 'purple', 'linewidth': 1.5})
                 st.markdown("*(Sağ kenardaki mor oklar rüzgar yönü ve hızını göstermektedir.)*")
-
 
             skew.ax.set_title(f'Skew-T Diyagramı (Konum: {user_lat:.2f}, {user_lon:.2f})', fontsize=16, weight='bold')
             skew.ax.set_xlabel('Sıcaklık (°C)', fontsize=12)
             skew.ax.set_ylabel('Basınç (hPa)', fontsize=12)
             skew.ax.legend(loc='upper left')
-            skew.ax.set_ylim(1050, 100) # Y ekseni limitleri ayarlandı
-            skew.ax.set_xlim(-40, 40)  # X ekseni limitleri ayarlandı
+            skew.ax.set_ylim(1050, 100)
+            skew.ax.set_xlim(-40, 40)
             
-            # Izgara görünümünü iyileştirme
             skew.ax.grid(True, linestyle='--', alpha=0.6)
             
             st.pyplot(fig)

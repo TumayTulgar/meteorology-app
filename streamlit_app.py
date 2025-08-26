@@ -392,25 +392,28 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             skew.plot_moist_adiabats(color='darkgreen', linestyle=':', alpha=0.5)
             skew.plot_mixing_lines(color='brown', linestyle=':', alpha=0.5)
             
-            # Plot LCL, LFC, and EL if they exist and add text labels
-            # Adjusted x-offset to 0.5 for better label placement
+            # Plot LCL, LFC, and EL if they exist and add text labels using annotate
+            # This is the improved method to avoid issues with plot scaling
             if lcl_p is not None and lcl_t is not None:
                 ax.plot(lcl_t, lcl_p, 'o', markerfacecolor='black', markeredgecolor='white', markersize=8)
-                ax.text(lcl_t.magnitude + 0.5, lcl_p.magnitude, 'LCL', 
-                             fontsize=11, color='white', ha='left', va='center',
-                             path_effects=[pe.Stroke(linewidth=2, foreground='black'), pe.Normal()])
-            
+                ax.annotate('LCL', xy=(lcl_t, lcl_p), xycoords='data',
+                            xytext=(10, 0), textcoords='offset points', ha='left', va='center',
+                            fontsize=11, color='white',
+                            path_effects=[pe.Stroke(linewidth=2, foreground='black'), pe.Normal()])
+
             if lfc_p is not None and lfc_t is not None:
                 ax.plot(lfc_t, lfc_p, 'o', markerfacecolor='red', markeredgecolor='white', markersize=8)
-                ax.text(lfc_t.magnitude + 0.5, lfc_p.magnitude, 'LFC', 
-                             fontsize=11, color='white', ha='left', va='center',
-                             path_effects=[pe.Stroke(linewidth=2, foreground='red'), pe.Normal()])
+                ax.annotate('LFC', xy=(lfc_t, lfc_p), xycoords='data',
+                            xytext=(10, 0), textcoords='offset points', ha='left', va='center',
+                            fontsize=11, color='white',
+                            path_effects=[pe.Stroke(linewidth=2, foreground='red'), pe.Normal()])
             
             if el_p is not None and el_t is not None:
                 ax.plot(el_t, el_p, 'o', markerfacecolor='blue', markeredgecolor='white', markersize=8)
-                ax.text(el_t.magnitude + 0.5, el_p.magnitude, 'EL', 
-                             fontsize=11, color='white', ha='left', va='center',
-                             path_effects=[pe.Stroke(linewidth=2, foreground='blue'), pe.Normal()])
+                ax.annotate('EL', xy=(el_t, el_p), xycoords='data',
+                            xytext=(10, 0), textcoords='offset points', ha='left', va='center',
+                            fontsize=11, color='white',
+                            path_effects=[pe.Stroke(linewidth=2, foreground='blue'), pe.Normal()])
 
             # Plot wind barbs
             wind_p_levels = pressure_levels_hpa * units.hPa

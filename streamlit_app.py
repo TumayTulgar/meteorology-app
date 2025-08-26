@@ -392,7 +392,7 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             skew.plot_moist_adiabats(color='darkgreen', linestyle=':', alpha=0.5)
             skew.plot_mixing_lines(color='brown', linestyle=':', alpha=0.5)
             
-            # Plot LCL, LFC, and EL if they exist
+            # Plot LCL, LFC, and EL if they exist and add text labels
             if lcl_p is not None and lcl_t is not None:
                 ax.plot(lcl_t, lcl_p, 'o', markerfacecolor='black', markeredgecolor='white', markersize=8)
                 ax.text(lcl_t.magnitude + 1, lcl_p.magnitude, 'LCL', 

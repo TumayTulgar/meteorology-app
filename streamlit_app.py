@@ -90,25 +90,25 @@ with col1:
 with col2:
     user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
 
-# --- Manuel Başlangıç Değerlerini Belirleme (st.number_input kullanılarak) ---
+# --- Manuel Başlangıç Değerlerini Belirleme (st.slider kullanılarak) ---
 with st.expander("Manuel Başlangıç Değerlerini Düzenle"):
-    st.info("Yükselen parselin başlangıç değerlerini klavyeyle girerek veya ok tuşlarıyla değiştirin.")
+    st.info("Yükselen parselin başlangıç değerlerini kaydırıcıları kullanarak seçin.")
     
-    p_start_manual = st.number_input("Parsel Başlangıç Basıncı (hPa)", 
-                                      min_value=980.0, 
-                                      max_value=1050.0, 
-                                      value=1013.25, 
-                                      step=1.0)
-    t_start_manual = st.number_input("Parsel Başlangıç Sıcaklığı (°C)", 
-                                      min_value=-50.0, 
-                                      max_value=50.0, 
-                                      value=20.0, 
-                                      step=0.5)
-    td_start_manual = st.number_input("Parsel Başlangıç Çiğ Noktası (°C)", 
-                                       min_value=-50.0, 
-                                       max_value=50.0, 
-                                       value=10.0, 
-                                       step=0.5)
+    p_start_manual = st.slider("Parsel Başlangıç Basıncı (hPa)", 
+                                min_value=980.0, 
+                                max_value=1050.0, 
+                                value=1013.25, 
+                                step=1.0)
+    t_start_manual = st.slider("Parsel Başlangıç Sıcaklığı (°C)", 
+                                min_value=-50.0, 
+                                max_value=50.0, 
+                                value=20.0, 
+                                step=0.5)
+    td_start_manual = st.slider("Parsel Başlangıç Çiğ Noktası (°C)", 
+                                 min_value=-50.0, 
+                                 max_value=50.0, 
+                                 value=10.0, 
+                                 step=0.5)
 
 if st.button("Analiz Et"):
     st.markdown("---")

@@ -361,18 +361,19 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             st.markdown("Atmosferik sıcaklık, çiğ noktası ve parsel yolunu gösteren termodinamik diyagram.")
             
             # Use fig, ax = plt.subplots(...) for better control and automatic sizing
-            fig, ax = plt.subplots(figsize=(12, 12))
-            skew = SkewT(ax, rotation=45)
+            fig = plt.figure(figsize=(12, 12))
+            skew = SkewT(fig, rotation=45)
+            ax = skew.ax # Added to get the Axes object for plotting
             
             # Plot the data using normal plotting functions, in this case using
             # log scaling in Y, as dictated by the typical meteorological plot
-            skew.plot(p_profile, temp_profile, 'red', linewidth=2.5, linestyle='-', label='Atmosfer Sıcaklığı',
+            ax.plot(temp_profile, p_profile, 'red', linewidth=2.5, linestyle='-', label='Atmosfer Sıcaklığı',
                       path_effects=[pe.Stroke(linewidth=3.5, foreground='black'), pe.Normal()])
-            skew.plot(p_profile, dewpoint_profile, 'green', linewidth=2.5, linestyle='-', label='Atmosfer Çiğ Noktası',
+            ax.plot(dewpoint_profile, p_profile, 'green', linewidth=2.5, linestyle='-', label='Atmosfer Çiğ Noktası',
                       path_effects=[pe.Stroke(linewidth=3.5, foreground='black'), pe.Normal()])
 
             # Plot the parcel profile as a black line
-            skew.plot(p_profile, parcel_temp_profile, 'blue', linestyle='--', linewidth=2, label='Yükselen Parsel (Manuel Başlangıç)',
+            ax.plot(parcel_temp_profile, p_profile, 'blue', linestyle='--', linewidth=2, label='Yükselen Parsel (Manuel Başlangıç)',
                       path_effects=[pe.Stroke(linewidth=3, foreground='gray'), pe.Normal()])
             
             # Shade areas of CAPE and CIN
@@ -384,7 +385,7 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
                 st.warning(f"CAPE/CIN bölgeleri gölgelendirilirken bir sorun oluştu: {e}")
 
             # Plot a zero degree isotherm
-            skew.ax.axvline(0, color='c', linestyle='--', linewidth=2, label='0°C İzotermi')
+            ax.axvline(0, color='c', linestyle='--', linewidth=2, label='0°C İzotermi')
 
             # Add the relevant special lines
             skew.plot_dry_adiabats(color='gray', linestyle=':', alpha=0.5)
@@ -393,20 +394,20 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             
             # Plot LCL, LFC, and EL if they exist
             if lcl_p is not None and lcl_t is not None:
-                skew.plot(lcl_p, lcl_t, 'o', markerfacecolor='black', markeredgecolor='white', markersize=8)
-                skew.ax.text(lcl_t.magnitude + 1, lcl_p.magnitude, 'LCL', 
+                ax.plot(lcl_t, lcl_p, 'o', markerfacecolor='black', markeredgecolor='white', markersize=8)
+                ax.text(lcl_t.magnitude + 1, lcl_p.magnitude, 'LCL', 
                              fontsize=11, color='white', ha='left', va='center',
                              path_effects=[pe.Stroke(linewidth=2, foreground='black'), pe.Normal()])
             
             if lfc_p is not None and lfc_t is not None:
-                skew.plot(lfc_p, lfc_t, 'o', markerfacecolor='red', markeredgecolor='white', markersize=8)
-                skew.ax.text(lfc_t.magnitude + 1, lfc_p.magnitude, 'LFC', 
+                ax.plot(lfc_t, lfc_p, 'o', markerfacecolor='red', markeredgecolor='white', markersize=8)
+                ax.text(lfc_t.magnitude + 1, lfc_p.magnitude, 'LFC', 
                              fontsize=11, color='white', ha='left', va='center',
                              path_effects=[pe.Stroke(linewidth=2, foreground='red'), pe.Normal()])
             
             if el_p is not None and el_t is not None:
-                skew.plot(el_p, el_t, 'o', markerfacecolor='blue', markeredgecolor='white', markersize=8)
-                skew.ax.text(el_t.magnitude + 1, el_p.magnitude, 'EL', 
+                ax.plot(el_t, el_p, 'o', markerfacecolor='blue', markeredgecolor='white', markersize=8)
+                ax.text(el_t.magnitude + 1, el_p.magnitude, 'EL', 
                              fontsize=11, color='white', ha='left', va='center',
                              path_effects=[pe.Stroke(linewidth=2, foreground='blue'), pe.Normal()])
 
@@ -430,14 +431,14 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
                 st.markdown("*(Sağ kenardaki mor oklar rüzgar yönü ve hızını göstermektedir.)*")
 
             # Final plot settings
-            skew.ax.set_title(f'Skew-T Diyagramı (Konum: {user_lat:.2f}, {user_lon:.2f})', fontsize=16, weight='bold')
-            skew.ax.set_xlabel('Sıcaklık (°C)', fontsize=12)
-            skew.ax.set_ylabel('Basınç (hPa)', fontsize=12)
-            skew.ax.legend(loc='upper left')
-            skew.ax.set_ylim(1050, 100)
-            skew.ax.set_xlim(-40, 40)
+            ax.set_title(f'Skew-T Diyagramı (Konum: {user_lat:.2f}, {user_lon:.2f})', fontsize=16, weight='bold')
+            ax.set_xlabel('Sıcaklık (°C)', fontsize=12)
+            ax.set_ylabel('Basınç (hPa)', fontsize=12)
+            ax.legend(loc='upper left')
+            ax.set_ylim(1050, 100)
+            ax.set_xlim(-40, 40)
             
-            skew.ax.grid(True, linestyle='--', alpha=0.6)
+            ax.grid(True, linestyle='--', alpha=0.6)
             
             st.pyplot(fig, use_container_width=True)
             st.markdown("---")

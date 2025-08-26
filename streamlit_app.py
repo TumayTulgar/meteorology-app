@@ -37,7 +37,7 @@ def generate_meteorological_comment(analysis_data):
             commentary.append("- **Durum:** Düşük Potansiyel Enerji 🌦️")
             commentary.append("- **Anlamı:** Kararsızlık sınırlıdır. Oluşacak fırtınaların genellikle **zayıf veya orta kuvvette** olması beklenir. Yerel sağanak yağışlar görülebilir.")
         else:
-            commentary.append("- **Durum:** Çok Düşük Potansiyel Enerji  tranquil")
+            commentary.append("- **Durum:** Çok Düşük Potansiyel Enerji 🌬️")
             commentary.append("- **Anlamı:** Atmosfer kararlıdır, ciddi bir konveksiyon (fırtına) oluşumu için yeterli enerji yoktur. Hava genellikle sakindir.")
     else:
         commentary.append("### Konvektif Potansiyel Enerji (CAPE): `Veri Yok`")
@@ -73,7 +73,7 @@ def generate_meteorological_comment(analysis_data):
             commentary.append("- **Durum:** Orta Kararsızlık ☁️")
             commentary.append("- **Anlamı:** Atmosfer orta derecede kararsızdır. Orta kuvvette fırtınalar ve sağanak yağışlar beklenebilir.")
         elif li >= 0 and li < 3:
-            commentary.append("- **Durum:** Zayıf Kararsızlık veya Kararlı 💧")
+            commentary.append("- **Durum:** Zayıf Kararsızlık veya Kararlı �")
             commentary.append("- **Anlamı:** Atmosfer kararlıdır veya çok hafif kararsızdır. Fırtına oluşumu ihtimali düşüktür.")
         else:
             commentary.append("- **Durum:** Kararlı Atmosfer 🌬️")
@@ -359,8 +359,9 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             st.header("📉 Skew-T Log-P Diyagramı")
             st.markdown("Atmosferik sıcaklık, çiğ noktası ve parsel yolunu gösteren termodinamik diyagram.")
             
-            fig = plt.figure(figsize=(12, 12))
-            skew = SkewT(fig, rotation=45)
+            # Use fig, ax = plt.subplots(...) for better control and automatic sizing
+            fig, ax = plt.subplots(figsize=(12, 12))
+            skew = SkewT(ax, rotation=45)
             
             # Plot the data using normal plotting functions, in this case using
             # log scaling in Y, as dictated by the typical meteorological plot
@@ -437,6 +438,7 @@ if st.button("🚀 Atmosferi Analiz Et", type="primary"):
             
             skew.ax.grid(True, linestyle='--', alpha=0.6)
             
-            st.pyplot(fig)
+            st.pyplot(fig, use_container_width=True)
             st.markdown("---")
             st.info("💡 **İpuçları:** Skew-T diyagramında: Kırmızı çizgi atmosfer sıcaklığını, yeşil çizgi çiğ noktası sıcaklığını, kesik mavi çizgi ise yükselen parselin sıcaklık değişimini gösterir. LCL, LFC ve EL noktaları konvektif seviyeleri işaretler.")
+�

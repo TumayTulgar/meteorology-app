@@ -184,35 +184,30 @@ if data_source == 'Küresel Model Verisi Kullan':
             st.pyplot(fig)
 
 elif data_source == 'Manuel Veri Gir':
-    st.subheader("Manuel Veri Girişi (Atmosferik Profil)")
-    st.warning("Bu manuel veri girişi sadece basit bir örnek için tasarlanmıştır. Gerçek bir sondaj verisi kadar detaylı ve doğru bir analiz sağlamaz.")
-    
-    pressures = [1000, 925, 850, 700, 500, 400, 300]
-    temps = []
-    dewpoints = []
-    
-    for p in pressures:
-        temps.append(st.number_input(f"{p} hPa Sıcaklık (°C)", value=20.0, step=0.1, key=f"temp_{p}"))
-        dewpoints.append(st.number_input(f"{p} hPa Çiğ Noktası (°C)", value=10.0, step=0.1, key=f"dew_{p}"))
-        
-    st.subheader("Manuel Veri Girişi (Parsel Başlangıç Değerleri)")
+    st.subheader("Manuel Veri Girişi (Sadece Başlangıç Değerleri)")
+    st.warning("Bu modda sadece yükselen parselin yolu gösterilecektir, çevresel atmosfer profili bulunmamaktadır.")
+
     p_start_manual = st.number_input("Parsel Başlangıç Basıncı (hPa)", value=1000.0, step=0.1)
     t_start_manual = st.number_input("Parsel Başlangıç Sıcaklığı (°C)", value=25.0, step=0.1)
     td_start_manual = st.number_input("Parsel Başlangıç Çiğ Noktası (°C)", value=15.0, step=0.1)
 
     if st.button("Manuel Verilerle Analiz Et"):
         st.markdown("---")
-        # --- Verileri birimlere dönüştürme ---
-        p_profile = np.array(pressures).astype(np.float64) * units.hPa
-        temp_profile = np.array(temps).astype(np.float64) * units.degC
-        dewpoint_profile = np.array(dewpoints).astype(np.float64) * units.degC
         
+        # --- Verileri birimlere dönüştürme ---
         p_start = p_start_manual * units.hPa
         t_start = t_start_manual * units.degC
         td_start = td_start_manual * units.degC
         
+        # --- Yükselen parsel profilini oluşturmak için basınç seviyeleri oluşturma ---
+        p_profile = np.linspace(p_start.m, 100, num=50) * units.hPa
+        
         # --- Parsel simülasyonu ve indeks hesaplamaları ---
         parcel_temp_profile = parcel_profile(p_profile, t_start, td_start)
+        
+        # Boş profiller oluşturarak Skew-T'nin çizim yapmamasını sağlıyoruz
+        temp_profile = np.full_like(p_profile.m, np.nan) * units.degC
+        dewpoint_profile = np.full_like(p_profile.m, np.nan) * units.degC
         
         cape, cin = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile)
         li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
@@ -239,14 +234,13 @@ elif data_source == 'Manuel Veri Gir':
         st.write(f"**K-İndeksi:** {k_index_val:.2f~P}")
         
         # --- Skew-T Diyagramını Çizme ve Gösterme ---
-        st.header("Skew-T Diyagramı (Manuel Veri)")
+        st.header("Skew-T Diyagramı (Manuel Veri - Sadece Parsel)")
         fig = plt.figure(figsize=(10, 10))
         skew = SkewT(fig, rotation=45)
         
-        skew.plot(p_profile, temp_profile, 'r', linewidth=2, label='Atmosfer Sıcaklığı')
-        skew.plot(p_profile, dewpoint_profile, 'g', linewidth=2, label='Atmosfer Çiğ Noktası')
+        # Sadece parsel yolunu çiziyoruz
         skew.plot(p_profile, parcel_temp_profile, 'k', linestyle='--', linewidth=2, label='Yükselen Parsel')
-        
+
         skew.plot_dry_adiabats()
         skew.plot_moist_adiabats()
         skew.plot_mixing_lines()
@@ -255,7 +249,7 @@ elif data_source == 'Manuel Veri Gir':
         skew.plot(lfc_p, lfc_t, 'ro', markerfacecolor='red', markersize=8, label='LFC')
         skew.plot(el_p, el_t, 'bo', markerfacecolor='blue', markersize=8, label='EL')
         
-        skew.ax.set_title('Skew-T Diyagramı (Manuel Veri)', fontsize=16)
+        skew.ax.set_title('Skew-T Diyagramı (Manuel Veri - Sadece Parsel)', fontsize=16)
         skew.ax.set_xlabel('Sıcaklık (°C)', fontsize=12)
         skew.ax.set_ylabel('Basınç (hPa)', fontsize=12)
         skew.ax.legend()

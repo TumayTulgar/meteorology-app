@@ -90,36 +90,18 @@ with col1:
 with col2:
     user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
 
-# --- Varsayılan değerleri tanımla ve session_state'i başlat ---
-if 'p_start_manual' not in st.session_state:
-    st.session_state.p_start_manual = 1013.25
-if 't_start_manual' not in st.session_state:
-    st.session_state.t_start_manual = 20.0
-if 'td_start_manual' not in st.session_state:
-    st.session_state.td_start_manual = 10.0
+# --- Seçilebilecek değer listelerini tanımla ---
+pressure_options = [1020.0, 1018.0, 1015.0, 1013.25, 1010.0, 1005.0, 1000.0, 995.0, 990.0]
+temperature_options = [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0]
+dewpoint_options = [-10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0]
 
-def reset_values():
-    """Butona basıldığında değerleri sıfırlar."""
-    st.session_state.p_start_manual = 1013.25
-    st.session_state.t_start_manual = 20.0
-    st.session_state.td_start_manual = 10.0
-
-# --- Manuel Başlangıç Değerlerini Belirleme ---
+# --- Manuel Başlangıç Değerlerini Belirleme (Selectbox kullanılarak) ---
 with st.expander("Manuel Başlangıç Değerlerini Düzenle"):
-    st.info("Yükselen parselin başlangıç değerlerini manuel olarak değiştirebilirsiniz.")
+    st.info("Yükselen parselin başlangıç değerlerini listeden seçerek değiştirebilirsiniz.")
     
-    st.session_state.p_start_manual = st.number_input("Parsel Başlangıç Basıncı (hPa)", 
-                                                      value=st.session_state.p_start_manual, 
-                                                      step=0.1, key="p_input")
-    st.session_state.t_start_manual = st.number_input("Parsel Başlangıç Sıcaklığı (°C)", 
-                                                      value=st.session_state.t_start_manual, 
-                                                      step=0.1, key="t_input")
-    st.session_state.td_start_manual = st.number_input("Parsel Başlangıç Çiğ Noktası (°C)", 
-                                                       value=st.session_state.td_start_manual, 
-                                                       step=0.1, key="td_input")
-    
-    # Sıfırlama butonu
-    st.button("Değerleri Sıfırla", on_click=reset_values)
+    p_start_manual = st.selectbox("Parsel Başlangıç Basıncı (hPa)", options=pressure_options, index=3) # Varsayılan 1013.25
+    t_start_manual = st.selectbox("Parsel Başlangıç Sıcaklığı (°C)", options=temperature_options, index=5) # Varsayılan 20.0
+    td_start_manual = st.selectbox("Parsel Başlangıç Çiğ Noktası (°C)", options=dewpoint_options, index=4) # Varsayılan 10.0
 
 if st.button("Analiz Et"):
     st.markdown("---")
@@ -146,9 +128,9 @@ if st.button("Analiz Et"):
         dewpoint_profile = dewpoint_from_relative_humidity(temp_profile, relative_humidity_profile)
         
         # --- Parsel verilerini birimlere dönüştürme (kullanıcının girdiği değerleri kullanıyoruz) ---
-        p_start = st.session_state.p_start_manual * units.hPa
-        t_start = st.session_state.t_start_manual * units.degC
-        td_start = st.session_state.td_start_manual * units.degC
+        p_start = p_start_manual * units.hPa
+        t_start = t_start_manual * units.degC
+        td_start = td_start_manual * units.degC
         
         # 4. Parsel simülasyonu ve indeks hesaplamaları
         parcel_temp_profile = parcel_profile(p_profile, t_start, td_start)

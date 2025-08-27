@@ -15,7 +15,7 @@ import pytz
 import warnings
 import folium
 from streamlit_folium import st_folium
-import plotly.graph_objects as go # Plotly'nin bu bölümünü kullanıyoruz
+import plotly.graph_objects as go 
 
 # MetPy uyarılarını gizle
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='metpy')
@@ -26,7 +26,7 @@ def get_weather_data(latitude: float, longitude: float):
     Open-Meteo API'den atmosferik profil verilerini çeker.
     """
     try:
-        url = "https://api.open-meteo.com/v1/forecast"
+        url = "https://api.open-mete.com/v1/forecast"
         hourly_variables = [
             "temperature_1000hPa", "relative_humidity_1000hPa", "geopotential_height_1000hPa",
             "temperature_975hPa", "relative_humidity_975hPa", "geopotential_height_975hPa",
@@ -345,39 +345,70 @@ if st.button("Analiz Yap"):
             td_start = np.array([user_input_data['dew_point_2m']]).astype(np.float64) * units.degC
             
             indices = calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start)
-            
-            # --- KI Göstergesi (Yeni Eklendi) ---
-            st.subheader("3. Fırtına Potansiyeli")
+
+            st.subheader("3. Fırtına Potansiyeli Göstergeleri")
+
             if indices:
-                ki_value = indices['ki'].magnitude
+                # Kolonlar oluşturma
+                col1, col2, col3 = st.columns(3)
 
-                fig = go.Figure(go.Indicator(
-                    mode="gauge+number+delta",
-                    value=ki_value,
-                    title={'text': "K-İndeksi"},
-                    domain={'x': [0, 1], 'y': [0, 1]},
-                    gauge={
-                        'axis': {'range': [None, 50], 'tickwidth': 1, 'tickcolor': "darkblue"},
-                        'bar': {'color': "darkblue"},
-                        'bgcolor': "white",
-                        'borderwidth': 2,
-                        'bordercolor': "gray",
-                        'steps': [
-                            {'range': [0, 15], 'color': "green", 'name': 'Düşük'},
-                            {'range': [15, 25], 'color': "yellow", 'name': 'Orta'},
-                            {'range': [25, 35], 'color': "orange", 'name': 'Yüksek'},
-                            {'range': [35, 50], 'color': "red", 'name': 'Çok Yüksek'}],
-                        'threshold': {
-                            'line': {'color': "red", 'width': 4},
-                            'thickness': 0.75,
-                            'value': ki_value}}))
+                # KI Göstergesi
+                with col1:
+                    ki_value = indices['ki'].magnitude
+                    fig_ki = go.Figure(go.Indicator(
+                        mode="gauge+number",
+                        value=ki_value,
+                        title={'text': "K-İndeksi"},
+                        domain={'x': [0, 1], 'y': [0, 1]},
+                        gauge={
+                            'axis': {'range': [None, 50], 'tickwidth': 1},
+                            'bar': {'color': "darkblue"},
+                            'steps': [
+                                {'range': [0, 15], 'color': "green"},
+                                {'range': [15, 25], 'color': "yellow"},
+                                {'range': [25, 35], 'color': "orange"},
+                                {'range': [35, 50], 'color': "red"}]}))
+                    st.plotly_chart(fig_ki, use_container_width=True)
 
-                fig.update_layout(height=250, margin={'t': 0, 'b': 0, 'l': 0})
-                st.plotly_chart(fig, use_container_width=True)
+                # CAPE Göstergesi
+                with col2:
+                    cape_value = indices['cape_sfc'].magnitude
+                    fig_cape = go.Figure(go.Indicator(
+                        mode="gauge+number",
+                        value=cape_value,
+                        title={'text': "CAPE"},
+                        domain={'x': [0, 1], 'y': [0, 1]},
+                        gauge={
+                            'axis': {'range': [None, 4000], 'tickwidth': 1},
+                            'bar': {'color': "darkblue"},
+                            'steps': [
+                                {'range': [0, 500], 'color': "green"},
+                                {'range': [500, 1500], 'color': "yellow"},
+                                {'range': [1500, 3000], 'color': "orange"},
+                                {'range': [3000, 4000], 'color': "red"}]}))
+                    st.plotly_chart(fig_cape, use_container_width=True)
+                
+                # CIN Göstergesi
+                with col3:
+                    cin_value = indices['cin_sfc'].magnitude
+                    fig_cin = go.Figure(go.Indicator(
+                        mode="gauge+number",
+                        value=abs(cin_value),
+                        title={'text': "CIN"},
+                        domain={'x': [0, 1], 'y': [0, 1]},
+                        gauge={
+                            'axis': {'range': [0, 300], 'tickwidth': 1},
+                            'bar': {'color': "darkblue"},
+                            'steps': [
+                                {'range': [0, 50], 'color': "red"},
+                                {'range': [50, 200], 'color': "yellow"},
+                                {'range': [200, 300], 'color': "green"}]}))
+                    st.plotly_chart(fig_cin, use_container_width=True)
+
 
             st.write("---")
 
-            st.subheader("4. Meteorolojik İndeksler")
+            st.subheader("5. Detaylı Meteorolojik İndeksler")
             if indices:
                 # Yükselme İndeksi (LI)
                 li_value = indices['li'].magnitude[0]
@@ -427,7 +458,7 @@ if st.button("Analiz Yap"):
                     st.error("Düşük Engelleme. Atmosfer kolayca kararsız hale gelebilir ve fırtına oluşumu kolaylaşır.")
                 
                 # --- Skew-T Diyagramı ---
-                st.subheader("5. Skew-T Diyagramı")
+                st.subheader("6. Skew-T Diyagramı")
                 plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])
             
     except Exception as e:

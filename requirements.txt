@@ -4,5 +4,7 @@ numpy
 matplotlib
 metpy
 requests
+pytz
 folium
 streamlit-folium
+plotly

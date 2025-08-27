@@ -182,23 +182,36 @@ def plot_skewt(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile, w
 # Fonksiyon: API'den veriyi çek ve yüzey parametrelerini güncelle
 def reset_and_fetch_api_data():
     """
-    Seçili konum için güncel yüzey verilerini API'den çeker ve slider'ları günceller.
-    Bu fonksiyonu önbelleksiz hale getirdik.
+    Seçili konum ve zaman için API'den veriyi çeker ve yüzey parametrelerini günceller.
     """
     with st.spinner("Güncel veriler çekiliyor..."):
         user_lat = st.session_state.coords[0]
         user_lon = st.session_state.coords[1]
-        
-        _, current_data = get_weather_data(user_lat, user_lon)
+        analysis_hour = int(st.session_state.analysis_time_str.split(':')[0])
 
-        if not current_data:
-            st.warning("Güncel yüzey verileri alınamadı.")
+        # API'den tüm saatlik verileri çek
+        hourly_df, _ = get_weather_data(user_lat, user_lon)
+        
+        if hourly_df.empty:
+            st.warning("Saatlik veriler alınamadı. Lütfen tekrar deneyin.")
             return
 
-        # Yüzey parametrelerini güncel API verileriyle güncelle
-        st.session_state.user_temp = current_data.get('temperature_2m', st.session_state.user_temp)
-        st.session_state.user_rh = current_data.get('relative_humidity_2m', st.session_state.user_rh)
-        st.session_state.user_pressure = current_data.get('pressure_msl', st.session_state.user_pressure)
+        # En yakın saate ait veriyi bul
+        local_timezone = pytz.timezone('Europe/Istanbul')
+        analysis_time_local = local_timezone.localize(datetime.now().replace(hour=analysis_hour, minute=0, second=0, microsecond=0))
+        analysis_time_utc = analysis_time_local.astimezone(pytz.utc)
+        time_diffs = (hourly_df['time'] - analysis_time_utc).abs()
+        closest_hour_idx = time_diffs.argmin()
+        closest_hourly_data = hourly_df.iloc[closest_hour_idx]
+
+        # Yüzey parametrelerini seçilen saate ait verilerle güncelle
+        # 1000hPa seviyesindeki verileri kullanıyoruz.
+        st.session_state.user_temp = closest_hourly_data.get('temperature_1000hPa', 20.0)
+        st.session_state.user_rh = closest_hourly_data.get('relative_humidity_1000hPa', 60.0)
+        # Basınç değeri için API'den gelen veriyi kullanmak yerine,
+        # bu verilerin 1000hPa seviyesine ait olduğunu belirtmek için sabit bir değer atayabiliriz.
+        # Bu, kullanıcıya arayüzdeki slider'ın 1000hPa verisini temsil ettiğini belirtir.
+        st.session_state.user_pressure = 1000.0
 
 
 # Streamlit Arayüzü

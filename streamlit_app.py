@@ -15,7 +15,7 @@ import pytz
 import warnings
 import folium
 from streamlit_folium import st_folium
-import plotly.express as px
+import plotly.graph_objects as go # Plotly'nin bu bölümünü kullanıyoruz
 
 # MetPy uyarılarını gizle
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='metpy')
@@ -346,10 +346,39 @@ if st.button("Analiz Yap"):
             
             indices = calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start)
             
-            st.subheader("3. Meteorolojik İndeksler")
+            # --- KI Göstergesi (Yeni Eklendi) ---
+            st.subheader("3. Fırtına Potansiyeli")
             if indices:
-                st.write("---")
-                
+                ki_value = indices['ki'].magnitude
+
+                fig = go.Figure(go.Indicator(
+                    mode="gauge+number+delta",
+                    value=ki_value,
+                    title={'text': "K-İndeksi"},
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    gauge={
+                        'axis': {'range': [None, 50], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                        'bar': {'color': "darkblue"},
+                        'bgcolor': "white",
+                        'borderwidth': 2,
+                        'bordercolor': "gray",
+                        'steps': [
+                            {'range': [0, 15], 'color': "green", 'name': 'Düşük'},
+                            {'range': [15, 25], 'color': "yellow", 'name': 'Orta'},
+                            {'range': [25, 35], 'color': "orange", 'name': 'Yüksek'},
+                            {'range': [35, 50], 'color': "red", 'name': 'Çok Yüksek'}],
+                        'threshold': {
+                            'line': {'color': "red", 'width': 4},
+                            'thickness': 0.75,
+                            'value': ki_value}}))
+
+                fig.update_layout(height=250, margin={'t': 0, 'b': 0, 'l': 0})
+                st.plotly_chart(fig, use_container_width=True)
+
+            st.write("---")
+
+            st.subheader("4. Meteorolojik İndeksler")
+            if indices:
                 # Yükselme İndeksi (LI)
                 li_value = indices['li'].magnitude[0]
                 st.markdown(f"**Yükselme İndeksi (LI)**: {li_value:.2f} °C")
@@ -361,7 +390,6 @@ if st.button("Analiz Yap"):
                 st.write("---")
 
                 # K-İndeksi (KI)
-                ki_value = indices['ki'].magnitude
                 st.markdown(f"**K-İndeksi (KI)**: {ki_value:.2f} °C")
                 if ki_value >= 35:
                     st.error("Çok Yüksek Fırtına Potansiyeli. Çok kuvvetli yağış ve fırtına ihtimali yüksek.")
@@ -398,43 +426,6 @@ if st.button("Analiz Yap"):
                 else:
                     st.error("Düşük Engelleme. Atmosfer kolayca kararsız hale gelebilir ve fırtına oluşumu kolaylaşır.")
                 
-                # --- Zaman Serisi Grafiği (Yeni Eklendi) ---
-                st.subheader("4. Zaman Serisi Grafiği")
-                st.markdown("Seçilen konum için önümüzdeki 24 saate ait sıcaklık, bağıl nem ve rüzgar değerleri.")
-
-                time_series_df = hourly_df.copy()
-                time_series_df['time'] = time_series_df['time'].dt.tz_convert(local_timezone)
-                time_series_df = time_series_df.set_index('time')
-
-                # Sadece ilgili sütunları seçerek bir grafik oluşturun
-                fig = px.line(
-                    time_series_df[[
-                        "temperature_1000hPa",
-                        "relative_humidity_1000hPa",
-                        "wind_speed_1000hPa"
-                    ]],
-                    title="Atmosferik Veriler (24 Saat)",
-                    labels={
-                        "value": "Değer",
-                        "variable": "Değişken"
-                    }
-                )
-
-                # Y-ekseni etiketlerini daha anlaşılır hale getirin
-                new_names = {
-                    'temperature_1000hPa': 'Sıcaklık (°C)',
-                    'relative_humidity_1000hPa': 'Bağıl Nem (%)',
-                    'wind_speed_1000hPa': 'Rüzgar Hızı (km/h)'
-                }
-                fig.for_each_trace(lambda t: t.update(name=new_names[t.name]))
-
-                fig.update_layout(
-                    xaxis_title='Zaman',
-                    yaxis_title='Değer'
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
-
                 # --- Skew-T Diyagramı ---
                 st.subheader("5. Skew-T Diyagramı")
                 plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])

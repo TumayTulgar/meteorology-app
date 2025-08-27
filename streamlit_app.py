@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from metpy.units import units
 from metpy.calc import (
-    parcel_profile, cape_cin, lcl,
-    lifted_index, k_index, dewpoint_from_relative_humidity,
-    wind_components,
+    cape_cin, lifted_index, k_index,
+    dewpoint_from_relative_humidity, wind_components,
+    parcel_profile_with_lcl
 )
 from metpy.plots import SkewT
 from datetime import datetime
@@ -131,8 +131,15 @@ def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_star
     Meteorolojik indeksleri hesaplar ve döndürür.
     """
     try:
-        lcl_pressure, lcl_temperature = lcl(p_start[0], t_start[0], td_start[0])
-        parcel_temp_profile = parcel_profile(p_profile, t_start[0], td_start[0])
+        # LCL'yi içeren parsel profilini tek bir fonksiyonla hesapla
+        p_parcel, T_ambient_wLCL, Td_ambient_wLCL, parcel_temp_profile = parcel_profile_with_lcl(
+            p_profile, t_start[0], td_start[0]
+        )
+        
+        # p_parcel dizisinin ilk elemanı LCL'ye denk gelir.
+        lcl_pressure = p_parcel[0]
+        lcl_temperature = parcel_temp_profile[0]
+
         li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
         ki = k_index(p_profile, temp_profile, dewpoint_profile)
         cape_sfc, cin_sfc = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_profile=parcel_temp_profile)
@@ -151,9 +158,9 @@ def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_star
         return None
 
 # Fonksiyon: Skew-T diyagramı çizme
-def plot_skewt(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile, wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_pressure_msl):
+def plot_skewt(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile, wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_pressure_msl, lcl_pressure, lcl_temperature):
     """
-    Skew-T diyagramını oluşturur.
+    Skew-T diyagramını oluşturur ve LCL noktasını ekler.
     """
     fig = plt.figure(figsize=(10, 10))
     skew = SkewT(fig, rotation=45)
@@ -161,6 +168,9 @@ def plot_skewt(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile, w
     skew.plot(p_profile, temp_profile, 'r', linewidth=2, label='Atmosfer Sıcaklığı')
     skew.plot(p_profile, dewpoint_profile, 'g', linewidth=2, label='Atmosfer Çiğ Noktası')
     skew.plot(p_profile, parcel_temp_profile, 'k', linestyle='--', linewidth=2, label='Yüzey Parseli')
+    
+    # LCL noktasını diyagrama ekle
+    skew.plot(lcl_pressure, lcl_temperature, 'ko', markerfacecolor='k', markersize=8, label='LCL')
 
     skew.shade_cin(p_profile, temp_profile, parcel_temp_profile)
     skew.shade_cape(p_profile, temp_profile, parcel_temp_profile)
@@ -317,7 +327,6 @@ if st.button("Analiz Yap"):
             'pressure_msl': st.session_state.user_pressure
         }
         
-        # Sadece analiz için API'den veri çek
         with st.spinner("Analiz için atmosferik profiller oluşturuluyor..."):
             hourly_df = get_weather_data(user_lat, user_lon)
             if hourly_df.empty:
@@ -355,7 +364,6 @@ if st.button("Analiz Yap"):
                 # Kolonlar oluşturma
                 col1, col2, col3 = st.columns(3)
 
-                # KI Göstergesi
                 with col1:
                     ki_value = indices['ki'].magnitude
                     fig_ki = go.Figure(go.Indicator(
@@ -373,7 +381,6 @@ if st.button("Analiz Yap"):
                                 {'range': [35, 50], 'color': "red"}]}))
                     st.plotly_chart(fig_ki, use_container_width=True)
 
-                # CAPE Göstergesi
                 with col2:
                     cape_value = indices['cape_sfc'].magnitude
                     fig_cape = go.Figure(go.Indicator(
@@ -391,7 +398,6 @@ if st.button("Analiz Yap"):
                                 {'range': [3000, 4000], 'color': "red"}]}))
                     st.plotly_chart(fig_cape, use_container_width=True)
                 
-                # CIN Göstergesi
                 with col3:
                     cin_value = indices['cin_sfc'].magnitude
                     fig_cin = go.Figure(go.Indicator(
@@ -413,7 +419,6 @@ if st.button("Analiz Yap"):
 
             st.subheader("4. Detaylı Meteorolojik İndeksler")
             if indices:
-                # Yükselme İndeksi (LI)
                 li_value = indices['li'].magnitude[0]
                 st.markdown(f"**Yükselme İndeksi (LI)**: {li_value:.2f} °C")
                 if li_value < 0:
@@ -423,7 +428,7 @@ if st.button("Analiz Yap"):
 
                 st.write("---")
 
-                # K-İndeksi (KI)
+                ki_value = indices['ki'].magnitude
                 st.markdown(f"**K-İndeksi (KI)**: {ki_value:.2f} °C")
                 if ki_value >= 35:
                     st.error("Çok Yüksek Fırtına Potansiyeli. Çok kuvvetli yağış ve fırtına ihtimali yüksek.")
@@ -436,7 +441,6 @@ if st.button("Analiz Yap"):
 
                 st.write("---")
 
-                # Konvektif Kullanılabilir Potansiyel Enerji (CAPE)
                 cape_value = indices['cape_sfc'].magnitude
                 st.markdown(f"**Konvektif Kullanılabilir Potansiyel Enerji (CAPE)**: {cape_value:.2f} J/kg")
                 if cape_value > 3000:
@@ -450,7 +454,6 @@ if st.button("Analiz Yap"):
 
                 st.write("---")
 
-                # Konvektif Engelleme (CIN)
                 cin_value = indices['cin_sfc'].magnitude
                 st.markdown(f"**Konvektif Engelleme (CIN)**: {cin_value:.2f} J/kg")
                 if cin_value > 200:
@@ -462,7 +465,13 @@ if st.button("Analiz Yap"):
                 
                 # --- Skew-T Diyagramı ---
                 st.subheader("5. Skew-T Diyagramı")
-                plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])
+                plot_skewt(
+                    p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], 
+                    wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, 
+                    user_input_data['pressure_msl'], 
+                    indices['lcl_pressure'], 
+                    indices['lcl_temperature']
+                )
             
     except Exception as e:
         st.error(f"Analiz sırasında bir hata oluştu: {e}")

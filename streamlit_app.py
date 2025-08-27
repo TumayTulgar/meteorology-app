@@ -419,7 +419,7 @@ if st.button("Analiz Yap"):
 
             st.subheader("4. Detaylı Meteorolojik İndeksler")
             if indices:
-                li_value = indices['li'].magnitude[0]
+                li_value = indices['li'].magnitude
                 st.markdown(f"**Yükselme İndeksi (LI)**: {li_value:.2f} °C")
                 if li_value < 0:
                     st.info("Negatif değerler **kararsızlığı** gösterir. Fırtına olasılığı artar.")

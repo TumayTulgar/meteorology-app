@@ -6,7 +6,6 @@ from metpy.units import units
 from metpy.calc import (
     parcel_profile, cape_cin, lcl,
     lifted_index, k_index, dewpoint_from_relative_humidity,
-    most_unstable_cape_cin, mixed_layer_cape_cin,
     wind_components,
     mixing_ratio_from_relative_humidity,
     galvez_davison_index
@@ -20,7 +19,6 @@ import warnings
 # MetPy uyarılarını gizle
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='metpy')
 
-@st.cache_data(show_spinner=False)
 def get_weather_data(latitude: float, longitude: float):
     """
     Open-Meteo API'den atmosferik profil verilerini çeker.
@@ -185,7 +183,7 @@ st.markdown("""
 Bu araç, Open-Meteo API'sinden alınan atmosferik verileri kullanarak **Skew-T Diyagramı** çizerek meteorolojik analizler yapmanızı sağlar.
 """)
 
-st.subheader("1. Konum Bilgileri")
+st.subheader("1. Konum ve Zaman Bilgileri")
 with st.container():
     col1, col2 = st.columns(2)
     with col1:
@@ -193,60 +191,41 @@ with st.container():
     with col2:
         user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
 
-if st.button("Verileri Çek"):
-    with st.spinner("Veriler yükleniyor..."):
-        hourly_df, current_data = get_weather_data(user_lat, user_lon)
-    if not hourly_df.empty and current_data:
-        st.session_state['data_fetched'] = True
-        st.session_state['hourly_df'] = hourly_df
-        st.session_state['current_data'] = current_data
-        st.success("Veriler başarıyla çekildi!")
-    else:
-        st.error("Veri çekilemedi. Lütfen konum bilgilerini kontrol edin.")
+local_timezone = pytz.timezone('Europe/Istanbul')
+current_hour_local = datetime.now(local_timezone).hour
+analysis_hour = st.slider("Analiz Saati (0-23)", min_value=0, max_value=23, value=current_hour_local)
 
-if 'data_fetched' in st.session_state and st.session_state.data_fetched:
-    st.subheader("2. Analiz Parametreleri")
+st.subheader("2. Yüzey Parametreleri (İsteğe Bağlı)")
 
-    local_timezone = pytz.timezone('Europe/Istanbul')
-    current_hour_local = datetime.now(local_timezone).hour
+# Başlangıçta boş veya varsayılan değerler
+temp_default = 20.0
+rh_default = 60.0
+pressure_default = 1013.25
+
+if 'initial_data' in st.session_state:
+    temp_default = st.session_state.initial_data.get('temperature_2m', 20.0)
+    rh_default = st.session_state.initial_data.get('relative_humidity_2m', 60.0)
+    pressure_default = st.session_state.initial_data.get('pressure_msl', 1013.25)
     
-    st.info(f"Varsayılan yüzey verileri API'den anlık olarak çekildi. İsterseniz kaydırma çubukları ile bu değerleri değiştirebilirsiniz.")
-    
-    # Varsayılan değerlerin varlığını kontrol et
-    if 'current_data' not in st.session_state:
-        # Hata durumunda güvenli varsayılan değerler
-        st.session_state.current_data = {
-            'temperature_2m': 20.0,
-            'relative_humidity_2m': 60.0,
-            'pressure_msl': 1013.25
-        }
-    
-    temp_default = st.session_state.current_data.get('temperature_2m', 20.0)
-    rh_default = st.session_state.current_data.get('relative_humidity_2m', 60.0)
-    pressure_default = st.session_state.current_data.get('pressure_msl', 1013.25)
-    
-    # Hata oluştuğunda değerin NaN olmaması için kontrol
-    temp_default = 20.0 if np.isnan(temp_default) else temp_default
-    rh_default = 60.0 if np.isnan(rh_default) else rh_default
-    pressure_default = 1013.25 if np.isnan(pressure_default) else pressure_default
+st.info("Kaydırma çubukları ile yüzey verilerini değiştirebilirsiniz. Değiştirmezseniz, otomatik olarak API verileri kullanılacaktır.")
 
-    col3, col4 = st.columns(2)
-    with col3:
-        analysis_hour = st.slider("Analiz Saati (0-23)", min_value=0, max_value=23, value=current_hour_local)
-    with col4:
-        user_pressure = st.slider(f"Yüzey Basıncı (hPa)", min_value=900.0, max_value=1050.0, value=float(pressure_default), step=0.5, format="%.2f")
+user_temp = st.slider("Yüzey Sıcaklığı (°C)", min_value=-20.0, max_value=50.0, value=float(temp_default), step=0.1, format="%.1f")
+user_rh = st.slider("Yüzey Bağıl Nemi (%)", min_value=0.0, max_value=100.0, value=float(rh_default), step=1.0, format="%.0f")
+user_pressure = st.slider(f"Yüzey Basıncı (hPa)", min_value=900.0, max_value=1050.0, value=float(pressure_default), step=0.5, format="%.2f")
 
-    user_temp = st.slider("Yüzey Sıcaklığı (°C)", min_value=-20.0, max_value=50.0, value=float(temp_default), step=0.1, format="%.1f")
-    user_rh = st.slider("Yüzey Bağıl Nemi (%)", min_value=0.0, max_value=100.0, value=float(rh_default), step=1.0, format="%.0f")
+# Sadece tek bir buton kullanılıyor
+if st.button("Analiz Yap"):
+    try:
+        with st.spinner("Veriler çekiliyor ve analiz yapılıyor..."):
+            hourly_df, current_data = get_weather_data(user_lat, user_lon)
+            
+            if not hourly_df.empty and current_data:
+                # API'den gelen verileri kaydet, sonraki işlemler için
+                st.session_state.initial_data = current_data
 
-    if st.button("Analiz Yap ve Diyagramı Çiz"):
-        try:
-            with st.spinner("Analiz yapılıyor..."):
                 analysis_time_local = local_timezone.localize(datetime.now().replace(hour=analysis_hour, minute=0, second=0, microsecond=0))
                 analysis_time_utc = analysis_time_local.astimezone(pytz.utc)
 
-                hourly_df = st.session_state.hourly_df
-                
                 time_diffs = (hourly_df['time'] - analysis_time_utc).abs()
                 closest_hour_idx = time_diffs.argmin()
                 closest_hourly_data = hourly_df.iloc[closest_hour_idx]
@@ -322,5 +301,5 @@ if 'data_fetched' in st.session_state and st.session_state.data_fetched:
                     st.subheader("4. Skew-T Diyagramı")
                     plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])
                 
-        except Exception as e:
-            st.error(f"Bir hata oluştu: {e}")
+    except Exception as e:
+        st.error(f"Analiz sırasında bir hata oluştu: {e}")

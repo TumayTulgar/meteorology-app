@@ -14,6 +14,8 @@ from datetime import datetime
 import requests
 import pytz
 import warnings
+import folium
+from streamlit_folium import st_folium
 
 # MetPy uyarılarını gizle
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='metpy')
@@ -180,12 +182,28 @@ Bu araç, Open-Meteo API'sinden alınan atmosferik verileri kullanarak **Skew-T 
 """)
 
 st.subheader("1. Konum ve Zaman Bilgileri")
-with st.container():
-    col1, col2 = st.columns(2)
-    with col1:
-        user_lat = st.number_input("Enlem (°)", value=40.90, format="%.2f")
-    with col2:
-        user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
+
+# Haritayı oluştur ve koordinatları al
+initial_coords = [40.90, 27.47] # Tekirdağ, Türkiye varsayılan koordinatları
+if 'coords' not in st.session_state:
+    st.session_state.coords = initial_coords
+
+m = folium.Map(location=st.session_state.coords, zoom_start=12)
+folium.Marker(st.session_state.coords, popup="Seçilen Konum").add_to(m)
+
+st.markdown("Harita üzerinde analiz yapmak istediğiniz konumu seçin.")
+map_data = st_folium(m, height=350, width=700)
+
+if map_data and map_data.get("last_clicked"):
+    user_lat = map_data["last_clicked"]["lat"]
+    user_lon = map_data["last_clicked"]["lng"]
+    st.session_state.coords = [user_lat, user_lon]
+else:
+    user_lat = st.session_state.coords[0]
+    user_lon = st.session_state.coords[1]
+
+st.write(f"Seçilen Enlem: **{user_lat:.2f}°**")
+st.write(f"Seçilen Boylam: **{user_lon:.2f}°**")
 
 local_timezone = pytz.timezone('Europe/Istanbul')
 current_hour_local = datetime.now(local_timezone).hour
@@ -212,7 +230,6 @@ user_temp = st.slider("Yüzey Sıcaklığı (°C)", min_value=-20.0, max_value=5
 user_rh = st.slider("Yüzey Bağıl Nemi (%)", min_value=0.0, max_value=100.0, value=float(rh_default), step=1.0, format="%.0f")
 user_pressure = st.slider(f"Yüzey Basıncı (hPa)", min_value=900.0, max_value=1050.0, value=float(pressure_default), step=0.5, format="%.2f")
 
-# Sadece tek bir buton kullanılıyor
 if st.button("Analiz Yap"):
     try:
         with st.spinner("Veriler çekiliyor ve analiz yapılıyor..."):

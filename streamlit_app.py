@@ -65,13 +65,13 @@ def get_weather_data(latitude: float, longitude: float):
             "wind_speed_100hPa", "wind_direction_100hPa",
             "wind_speed_70hPa", "wind_direction_70hPa",
             "wind_speed_50hPa", "wind_direction_50hPa",
-            "wind_speed_30hPa", "wind_direction_30hPa"
+            "wind_direction_850hPa", "pressure_msl",
+            "wind_direction_30hPa"
         ]
         params = {
             "latitude": latitude,
             "longitude": longitude,
             "hourly": ",".join(hourly_variables),
-            "current": "temperature_2m,relative_humidity_2m,pressure_msl,dew_point_2m",
             "timezone": "auto",
             "forecast_days": 1,
         }
@@ -82,20 +82,19 @@ def get_weather_data(latitude: float, longitude: float):
         
         if "hourly" not in data:
             st.error("API yanıtı saatlik veri içermiyor.")
-            return pd.DataFrame(), {}
+            return pd.DataFrame()
         
         hourly_df = pd.DataFrame(data["hourly"])
         hourly_df["time"] = pd.to_datetime(hourly_df["time"]).dt.tz_localize('UTC')
-        current_data = data.get("current", {})
 
-        return hourly_df, current_data
+        return hourly_df
 
     except requests.exceptions.RequestException as e:
         st.error(f"Hata: API'ye bağlanırken bir sorun oluştu. Lütfen konum değerlerini veya internet bağlantınızı kontrol edin. Hata: {e}")
-        return pd.DataFrame(), {}
+        return pd.DataFrame()
     except ValueError as e:
         st.error(f"Hata: Veri işlenirken bir sorun oluştu. Hata: {e}")
-        return pd.DataFrame(), {}
+        return pd.DataFrame()
 
 # Fonksiyon: Profil oluşturma (önbellek ile)
 @st.cache_data(show_spinner=False)
@@ -189,14 +188,14 @@ def reset_and_fetch_api_data():
         user_lon = st.session_state.coords[1]
         analysis_hour = int(st.session_state.analysis_time_str.split(':')[0])
 
-        # API'den tüm saatlik ve güncel verileri çek
-        hourly_df, current_data = get_weather_data(user_lat, user_lon)
+        # API'den tüm saatlik verileri çek
+        hourly_df = get_weather_data(user_lat, user_lon)
         
-        if hourly_df.empty or not current_data:
+        if hourly_df.empty:
             st.warning("Veriler alınamadı. Lütfen tekrar deneyin.")
             return
 
-        # En yakın saate ait 1000hPa verisini bul (sıcaklık ve nem için)
+        # En yakın saate ait veriyi bul
         local_timezone = pytz.timezone('Europe/Istanbul')
         analysis_time_local = local_timezone.localize(datetime.now().replace(hour=analysis_hour, minute=0, second=0, microsecond=0))
         analysis_time_utc = analysis_time_local.astimezone(pytz.utc)
@@ -204,12 +203,10 @@ def reset_and_fetch_api_data():
         closest_hour_idx = time_diffs.argmin()
         closest_hourly_data = hourly_df.iloc[closest_hour_idx]
 
-        # Yüzey sıcaklığı ve nemini seçili saate ait 1000hPa verisiyle güncelle
-        st.session_state.user_temp = closest_hourly_data.get('temperature_1000hPa', 20.0)
-        st.session_state.user_rh = closest_hourly_data.get('relative_humidity_1000hPa', 60.0)
-        
-        # Yüzey basıncını anlık deniz seviyesi basıncıyla güncelle
-        st.session_state.user_pressure = current_data.get('pressure_msl', 1013.25)
+        # Yüzey parametrelerini seçili saate ait verilerle güncelle
+        st.session_state.user_temp = closest_hourly_data.get('temperature_2m', 20.0)
+        st.session_state.user_rh = closest_hourly_data.get('relative_humidity_2m', 60.0)
+        st.session_state.user_pressure = closest_hourly_data.get('pressure_msl', 1013.25)
 
 
 # Streamlit Arayüzü
@@ -318,7 +315,7 @@ if st.button("Analiz Yap"):
         
         # Sadece analiz için API'den veri çek
         with st.spinner("Analiz için atmosferik profiller oluşturuluyor..."):
-            hourly_df, _ = get_weather_data(user_lat, user_lon)
+            hourly_df = get_weather_data(user_lat, user_lon)
             if hourly_df.empty:
                 st.error("API'den veri alınamadığı için analiz yapılamıyor.")
                 st.stop()

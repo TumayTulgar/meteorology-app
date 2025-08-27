@@ -20,7 +20,6 @@ import warnings
 # MetPy uyarılarını gizle
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='metpy')
 
-# Fonksiyonları olduğu gibi koru
 @st.cache_data(show_spinner=False)
 def get_weather_data(latitude: float, longitude: float):
     """
@@ -29,7 +28,6 @@ def get_weather_data(latitude: float, longitude: float):
     try:
         url = "https://api.open-meteo.com/v1/forecast"
         hourly_variables = [
-            # Termodinamik profil
             "temperature_1000hPa", "relative_humidity_1000hPa", "geopotential_height_1000hPa",
             "temperature_975hPa", "relative_humidity_975hPa", "geopotential_height_975hPa",
             "temperature_950hPa", "relative_humidity_950hPa", "geopotential_height_950hPa",
@@ -49,7 +47,6 @@ def get_weather_data(latitude: float, longitude: float):
             "temperature_70hPa", "relative_humidity_70hPa", "geopotential_height_70hPa",
             "temperature_50hPa", "relative_humidity_50hPa", "geopotential_height_50hPa",
             "temperature_30hPa", "relative_humidity_30hPa", "geopotential_height_30hPa",
-            # Rüzgar profili
             "wind_speed_1000hPa", "wind_direction_1000hPa",
             "wind_speed_975hPa", "wind_direction_975hPa",
             "wind_speed_950hPa", "wind_direction_950hPa",
@@ -82,14 +79,13 @@ def get_weather_data(latitude: float, longitude: float):
         response = requests.get(url, params=params)
         response.raise_for_status()
         data = response.json()
-
+        
         if "hourly" not in data:
             st.error("API yanıtı saatlik veri içermiyor.")
             return pd.DataFrame(), {}
-
+        
         hourly_df = pd.DataFrame(data["hourly"])
         hourly_df["time"] = pd.to_datetime(hourly_df["time"]).dt.tz_localize('UTC')
-
         current_data = data.get("current", {})
 
         return hourly_df, current_data
@@ -107,21 +103,18 @@ def create_profiles(hourly_row):
     API'den gelen verileri kullanarak tüm profilleri oluşturur.
     """
     pressure_levels_hpa = np.array([1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30])
-
     p_profile_data = pressure_levels_hpa
     t_profile_data = np.array([hourly_row.get(f'temperature_{p}hPa') for p in pressure_levels_hpa])
     rh_profile_data = np.array([hourly_row.get(f'relative_humidity_{p}hPa') for p in pressure_levels_hpa])
     wind_speed_data = np.array([hourly_row.get(f'wind_speed_{p}hPa') for p in pressure_levels_hpa])
     wind_direction_data = np.array([hourly_row.get(f'wind_direction_{p}hPa') for p in pressure_levels_hpa])
-
     valid_indices = ~np.isnan(t_profile_data) & ~np.isnan(rh_profile_data) & ~np.isnan(p_profile_data)
-
     p_profile = p_profile_data[valid_indices].astype(np.float64) * units.hPa
     temp_profile = t_profile_data[valid_indices].astype(np.float64) * units.degC
     rh_profile = rh_profile_data[valid_indices].astype(np.float64) * units.percent
     wind_speed = wind_speed_data[valid_indices].astype(np.float64) * units.km / units.hour
     wind_direction = wind_direction_data[valid_indices].astype(np.float64) * units.degrees
-
+    
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         dewpoint_profile = dewpoint_from_relative_humidity(temp_profile, rh_profile)
@@ -186,7 +179,6 @@ def plot_skewt(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile, w
 
     st.pyplot(fig)
 
-
 # Streamlit Arayüzü
 st.title("Atmosferik Profil ve Fırtına Analiz Aracı ⛈️")
 st.markdown("""
@@ -202,17 +194,15 @@ with st.container():
         user_lon = st.number_input("Boylam (°)", value=27.47, format="%.2f")
 
 if st.button("Verileri Çek"):
-    st.session_state.data_fetched = False
     with st.spinner("Veriler yükleniyor..."):
         hourly_df, current_data = get_weather_data(user_lat, user_lon)
     if not hourly_df.empty and current_data:
-        st.session_state.data_fetched = True
-        st.session_state.hourly_df = hourly_df
-        st.session_state.current_data = current_data
+        st.session_state['data_fetched'] = True
+        st.session_state['hourly_df'] = hourly_df
+        st.session_state['current_data'] = current_data
         st.success("Veriler başarıyla çekildi!")
     else:
         st.error("Veri çekilemedi. Lütfen konum bilgilerini kontrol edin.")
-
 
 if 'data_fetched' in st.session_state and st.session_state.data_fetched:
     st.subheader("2. Analiz Parametreleri")
@@ -222,20 +212,32 @@ if 'data_fetched' in st.session_state and st.session_state.data_fetched:
     
     st.info(f"Varsayılan yüzey verileri API'den anlık olarak çekildi. İsterseniz kaydırma çubukları ile bu değerleri değiştirebilirsiniz.")
     
-    # Varsayılan değerler
+    # Varsayılan değerlerin varlığını kontrol et
+    if 'current_data' not in st.session_state:
+        # Hata durumunda güvenli varsayılan değerler
+        st.session_state.current_data = {
+            'temperature_2m': 20.0,
+            'relative_humidity_2m': 60.0,
+            'pressure_msl': 1013.25
+        }
+    
     temp_default = st.session_state.current_data.get('temperature_2m', 20.0)
     rh_default = st.session_state.current_data.get('relative_humidity_2m', 60.0)
     pressure_default = st.session_state.current_data.get('pressure_msl', 1013.25)
     
+    # Hata oluştuğunda değerin NaN olmaması için kontrol
+    temp_default = 20.0 if np.isnan(temp_default) else temp_default
+    rh_default = 60.0 if np.isnan(rh_default) else rh_default
+    pressure_default = 1013.25 if np.isnan(pressure_default) else pressure_default
+
     col3, col4 = st.columns(2)
     with col3:
         analysis_hour = st.slider("Analiz Saati (0-23)", min_value=0, max_value=23, value=current_hour_local)
-        
     with col4:
-        user_pressure = st.slider(f"Yüzey Basıncı (hPa)", min_value=900.0, max_value=1050.0, value=pressure_default, step=0.5, format="%.2f")
+        user_pressure = st.slider(f"Yüzey Basıncı (hPa)", min_value=900.0, max_value=1050.0, value=float(pressure_default), step=0.5, format="%.2f")
 
-    user_temp = st.slider("Yüzey Sıcaklığı (°C)", min_value=-20.0, max_value=50.0, value=temp_default, step=0.1, format="%.1f")
-    user_rh = st.slider("Yüzey Bağıl Nemi (%)", min_value=0.0, max_value=100.0, value=rh_default, step=1.0, format="%.0f")
+    user_temp = st.slider("Yüzey Sıcaklığı (°C)", min_value=-20.0, max_value=50.0, value=float(temp_default), step=0.1, format="%.1f")
+    user_rh = st.slider("Yüzey Bağıl Nemi (%)", min_value=0.0, max_value=100.0, value=float(rh_default), step=1.0, format="%.0f")
 
     if st.button("Analiz Yap ve Diyagramı Çiz"):
         try:
@@ -244,16 +246,16 @@ if 'data_fetched' in st.session_state and st.session_state.data_fetched:
                 analysis_time_utc = analysis_time_local.astimezone(pytz.utc)
 
                 hourly_df = st.session_state.hourly_df
-                current_data = st.session_state.current_data
-
+                
                 time_diffs = (hourly_df['time'] - analysis_time_utc).abs()
                 closest_hour_idx = time_diffs.argmin()
                 closest_hourly_data = hourly_df.iloc[closest_hour_idx]
 
-                user_input_data = {}
-                user_input_data['temperature_2m'] = user_temp
-                user_input_data['relative_humidity_2m'] = user_rh
-                user_input_data['pressure_msl'] = user_pressure
+                user_input_data = {
+                    'temperature_2m': user_temp,
+                    'relative_humidity_2m': user_rh,
+                    'pressure_msl': user_pressure
+                }
 
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", RuntimeWarning)

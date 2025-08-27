@@ -20,7 +20,7 @@ import plotly.graph_objects as go
 # MetPy uyarılarını gizle
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='metpy')
 
-# Fonksiyon: API'den veri çekme
+# Fonksiyon: API'den veri çekme (önbellek olmadan)
 def get_weather_data(latitude: float, longitude: float):
     """
     Open-Meteo API'den atmosferik profil verilerini çeker.
@@ -97,7 +97,7 @@ def get_weather_data(latitude: float, longitude: float):
         st.error(f"Hata: Veri işlenirken bir sorun oluştu. Hata: {e}")
         return pd.DataFrame(), {}
 
-# Fonksiyon: Profil oluşturma
+# Fonksiyon: Profil oluşturma (önbellek ile)
 @st.cache_data(show_spinner=False)
 def create_profiles(hourly_row):
     """
@@ -183,12 +183,12 @@ def plot_skewt(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile, w
 def reset_and_fetch_api_data():
     """
     Seçili konum için güncel yüzey verilerini API'den çeker ve slider'ları günceller.
+    Bu fonksiyonu önbelleksiz hale getirdik.
     """
     with st.spinner("Güncel veriler çekiliyor..."):
         user_lat = st.session_state.coords[0]
         user_lon = st.session_state.coords[1]
         
-        # API'den sadece güncel verileri çekmek yeterli
         _, current_data = get_weather_data(user_lat, user_lon)
 
         if not current_data:
@@ -199,6 +199,7 @@ def reset_and_fetch_api_data():
         st.session_state.user_temp = current_data.get('temperature_2m', st.session_state.user_temp)
         st.session_state.user_rh = current_data.get('relative_humidity_2m', st.session_state.user_rh)
         st.session_state.user_pressure = current_data.get('pressure_msl', st.session_state.user_pressure)
+
 
 # Streamlit Arayüzü
 st.title("Atmosferik Profil ve Fırtına Analiz Aracı ⛈️")

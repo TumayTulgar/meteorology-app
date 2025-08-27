@@ -204,11 +204,10 @@ def reset_and_fetch_api_data():
         closest_hour_idx = time_diffs.argmin()
         closest_hourly_data = hourly_df.iloc[closest_hour_idx]
 
-        # Yüzey parametrelerini 2m'lik (güncel) API verileriyle güncelle
-        st.session_state.user_temp = current_data.get('temperature_2m', 20.0)
-        st.session_state.user_rh = current_data.get('relative_humidity_2m', 60.0)
-        st.session_state.user_pressure = current_data.get('pressure_msl', 1013.25)
-
+        # Yüzey parametrelerini 1000hPa seviyesindeki verilerle güncelle
+        st.session_state.user_temp = closest_hourly_data.get('temperature_1000hPa', 20.0)
+        st.session_state.user_rh = closest_hourly_data.get('relative_humidity_1000hPa', 60.0)
+        st.session_state.user_pressure = 1000.0 # 1000hPa verisini kullandığımızı varsayarak
 
 # Streamlit Arayüzü
 st.title("Atmosferik Profil ve Fırtına Analiz Aracı ⛈️")
@@ -408,7 +407,7 @@ if st.button("Analiz Yap"):
 
             st.write("---")
 
-            st.subheader("5. Detaylı Meteorolojik İndeksler")
+            st.subheader("4. Detaylı Meteorolojik İndeksler")
             if indices:
                 # Yükselme İndeksi (LI)
                 li_value = indices['li'].magnitude[0]
@@ -458,7 +457,7 @@ if st.button("Analiz Yap"):
                     st.error("Düşük Engelleme. Atmosfer kolayca kararsız hale gelebilir ve fırtına oluşumu kolaylaşır.")
                 
                 # --- Skew-T Diyagramı ---
-                st.subheader("6. Skew-T Diyagramı")
+                st.subheader("5. Skew-T Diyagramı")
                 plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])
             
     except Exception as e:

@@ -189,14 +189,14 @@ def reset_and_fetch_api_data():
         user_lon = st.session_state.coords[1]
         analysis_hour = int(st.session_state.analysis_time_str.split(':')[0])
 
-        # API'den tüm saatlik verileri çek
-        hourly_df, _ = get_weather_data(user_lat, user_lon)
+        # API'den tüm saatlik ve güncel verileri çek
+        hourly_df, current_data = get_weather_data(user_lat, user_lon)
         
-        if hourly_df.empty:
-            st.warning("Saatlik veriler alınamadı. Lütfen tekrar deneyin.")
+        if hourly_df.empty or not current_data:
+            st.warning("Veriler alınamadı. Lütfen tekrar deneyin.")
             return
 
-        # En yakın saate ait veriyi bul
+        # En yakın saate ait 1000hPa verisini bul (sıcaklık ve nem için)
         local_timezone = pytz.timezone('Europe/Istanbul')
         analysis_time_local = local_timezone.localize(datetime.now().replace(hour=analysis_hour, minute=0, second=0, microsecond=0))
         analysis_time_utc = analysis_time_local.astimezone(pytz.utc)
@@ -204,10 +204,12 @@ def reset_and_fetch_api_data():
         closest_hour_idx = time_diffs.argmin()
         closest_hourly_data = hourly_df.iloc[closest_hour_idx]
 
-        # Yüzey parametrelerini seçilen saate ait verilerle güncelle
+        # Yüzey sıcaklığı ve nemini seçili saate ait 1000hPa verisiyle güncelle
         st.session_state.user_temp = closest_hourly_data.get('temperature_1000hPa', 20.0)
         st.session_state.user_rh = closest_hourly_data.get('relative_humidity_1000hPa', 60.0)
-        st.session_state.user_pressure = 1000.0
+        
+        # Yüzey basıncını anlık deniz seviyesi basıncıyla güncelle
+        st.session_state.user_pressure = current_data.get('pressure_msl', 1013.25)
 
 
 # Streamlit Arayüzü

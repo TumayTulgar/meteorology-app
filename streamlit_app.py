@@ -15,6 +15,7 @@ import pytz
 import warnings
 import folium
 from streamlit_folium import st_folium
+import plotly.express as px
 
 # MetPy uyarılarını gizle
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='metpy')
@@ -397,7 +398,45 @@ if st.button("Analiz Yap"):
                 else:
                     st.error("Düşük Engelleme. Atmosfer kolayca kararsız hale gelebilir ve fırtına oluşumu kolaylaşır.")
                 
-                st.subheader("4. Skew-T Diyagramı")
+                # --- Zaman Serisi Grafiği (Yeni Eklendi) ---
+                st.subheader("4. Zaman Serisi Grafiği")
+                st.markdown("Seçilen konum için önümüzdeki 24 saate ait sıcaklık, bağıl nem ve rüzgar değerleri.")
+
+                time_series_df = hourly_df.copy()
+                time_series_df['time'] = time_series_df['time'].dt.tz_convert(local_timezone)
+                time_series_df = time_series_df.set_index('time')
+
+                # Sadece ilgili sütunları seçerek bir grafik oluşturun
+                fig = px.line(
+                    time_series_df[[
+                        "temperature_1000hPa",
+                        "relative_humidity_1000hPa",
+                        "wind_speed_1000hPa"
+                    ]],
+                    title="Atmosferik Veriler (24 Saat)",
+                    labels={
+                        "value": "Değer",
+                        "variable": "Değişken"
+                    }
+                )
+
+                # Y-ekseni etiketlerini daha anlaşılır hale getirin
+                new_names = {
+                    'temperature_1000hPa': 'Sıcaklık (°C)',
+                    'relative_humidity_1000hPa': 'Bağıl Nem (%)',
+                    'wind_speed_1000hPa': 'Rüzgar Hızı (km/h)'
+                }
+                fig.for_each_trace(lambda t: t.update(name=new_names[t.name]))
+
+                fig.update_layout(
+                    xaxis_title='Zaman',
+                    yaxis_title='Değer'
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+                # --- Skew-T Diyagramı ---
+                st.subheader("5. Skew-T Diyagramı")
                 plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])
             
     except Exception as e:

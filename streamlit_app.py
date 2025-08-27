@@ -25,7 +25,8 @@ def get_weather_data(latitude: float, longitude: float):
     Open-Meteo API'den atmosferik profil verilerini çeker.
     """
     try:
-        url = "https://api.open-meteo.com/v1/forecast"
+        url = "https://api.open-mete
+o.com/v1/forecast"
         hourly_variables = [
             "temperature_1000hPa", "relative_humidity_1000hPa", "geopotential_height_1000hPa",
             "temperature_975hPa", "relative_humidity_975hPa", "geopotential_height_975hPa",
@@ -178,20 +179,40 @@ def plot_skewt(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile, w
 
     st.pyplot(fig)
 
-# Fonksiyon: Sıcaklık değerini API'den gelen değere eşitle
-def reset_temp_to_api():
-    if 'initial_data' in st.session_state:
-        st.session_state.user_temp = st.session_state.initial_data.get('temperature_2m', 20.0)
+# Fonksiyon: API'den veriyi çek ve yüzey parametrelerini güncelle
+def reset_and_fetch_api_data():
+    """
+    Seçili konum ve zaman için API'den veriyi çeker ve yüzey parametrelerini günceller.
+    """
+    with st.spinner("Güncel veriler çekiliyor..."):
+        user_lat = st.session_state.coords[0]
+        user_lon = st.session_state.coords[1]
+        analysis_hour = int(st.session_state.analysis_time_str.split(':')[0])
 
-# Fonksiyon: Bağıl nem değerini API'den gelen değere eşitle
-def reset_rh_to_api():
-    if 'initial_data' in st.session_state:
-        st.session_state.user_rh = st.session_state.initial_data.get('relative_humidity_2m', 60.0)
+        hourly_df, current_data = get_weather_data(user_lat, user_lon)
 
-# Fonksiyon: Basınç değerini API'den gelen değere eşitle
-def reset_pressure_to_api():
-    if 'initial_data' in st.session_state:
-        st.session_state.user_pressure = st.session_state.initial_data.get('pressure_msl', 1013.25)
+        if hourly_df.empty or not current_data:
+            return
+
+        st.session_state.initial_data = current_data
+        
+        # En yakın saate ait veriyi bul
+        local_timezone = pytz.timezone('Europe/Istanbul')
+        analysis_time_local = local_timezone.localize(datetime.now().replace(hour=analysis_hour, minute=0, second=0, microsecond=0))
+        analysis_time_utc = analysis_time_local.astimezone(pytz.utc)
+        time_diffs = (hourly_df['time'] - analysis_time_utc).abs()
+        closest_hour_idx = time_diffs.argmin()
+        closest_hourly_data = hourly_df.iloc[closest_hour_idx]
+
+        # Yüzey parametrelerini en yakın saate ait API verileriyle güncelle
+        st.session_state.user_temp = closest_hourly_data.get('temperature_1000hPa', 20.0)
+        st.session_state.user_rh = closest_hourly_data.get('relative_humidity_1000hPa', 60.0)
+        st.session_state.user_pressure = 1000.0 # Open-Meteo 1000hPa'yı yüzey olarak kabul ediyor
+
+        # Ek bilgi: Eğer 2m sıcaklık istersen
+        # st.session_state.user_temp = current_data.get('temperature_2m', 20.0)
+        # st.session_state.user_rh = current_data.get('relative_humidity_2m', 60.0)
+        # st.session_state.user_pressure = current_data.get('pressure_msl', 1013.25)
 
 
 # Streamlit Arayüzü
@@ -227,12 +248,12 @@ local_timezone = pytz.timezone('Europe/Istanbul')
 current_hour_local = datetime.now(local_timezone).hour
 hour_options = [f"{h:02d}:00" for h in range(14, 24)]
 default_hour_str = f"{current_hour_local:02d}:00" if 14 <= current_hour_local <= 23 else "14:00"
-analysis_time_str = st.selectbox("Analiz Saati", options=hour_options, index=hour_options.index(default_hour_str))
-analysis_hour = int(analysis_time_str.split(':')[0])
+st.session_state.analysis_time_str = st.selectbox("Analiz Saati", options=hour_options, index=hour_options.index(default_hour_str))
+analysis_hour = int(st.session_state.analysis_time_str.split(':')[0])
 
 st.subheader("2. Yüzey Parametreleri (İsteğe Bağlı)")
 
-# Varsayılan değerler
+# session_state'te varsayılan değerleri kontrol et ve ata
 if 'user_temp' not in st.session_state:
     st.session_state.user_temp = 20.0
 if 'user_rh' not in st.session_state:
@@ -240,127 +261,127 @@ if 'user_rh' not in st.session_state:
 if 'user_pressure' not in st.session_state:
     st.session_state.user_pressure = 1013.25
 
-st.info("Kaydırma çubukları ile yüzey verilerini değiştirebilirsiniz. Her bir parametreyi API'den gelen değere döndürmek için yandaki butona basın.")
+st.info("Kaydırma çubukları ile yüzey verilerini değiştirebilirsiniz. Herhangi bir 'Sıfırla' butonuna basarak, seçili konum ve saate ait güncel API verilerini çekebilirsiniz.")
 
 # Her bir parametre için slider ve butonu yan yana koy
 temp_col, temp_btn_col = st.columns([0.7, 0.3])
 with temp_col:
-    st.session_state.user_temp = st.slider(
+    user_temp = st.slider(
         "Yüzey Sıcaklığı (°C)", 
         min_value=-20.0, 
         max_value=50.0, 
         value=float(st.session_state.user_temp), 
         step=0.1, 
-        format="%.1f"
+        format="%.1f",
+        key="user_temp"
     )
 with temp_btn_col:
     st.markdown("<br>", unsafe_allow_html=True)  # Hizalama için
-    st.button("Sıfırla", key="reset_temp", on_click=reset_temp_to_api)
+    st.button("Sıfırla", key="reset_temp", on_click=reset_and_fetch_api_data)
 
 rh_col, rh_btn_col = st.columns([0.7, 0.3])
 with rh_col:
-    st.session_state.user_rh = st.slider(
+    user_rh = st.slider(
         "Yüzey Bağıl Nemi (%)", 
         min_value=0.0, 
         max_value=100.0, 
         value=float(st.session_state.user_rh), 
         step=1.0, 
-        format="%.0f"
+        format="%.0f",
+        key="user_rh"
     )
 with rh_btn_col:
     st.markdown("<br>", unsafe_allow_html=True)
-    st.button("Sıfırla", key="reset_rh", on_click=reset_rh_to_api)
+    st.button("Sıfırla", key="reset_rh", on_click=reset_and_fetch_api_data)
 
 pressure_col, pressure_btn_col = st.columns([0.7, 0.3])
 with pressure_col:
-    st.session_state.user_pressure = st.slider(
+    user_pressure = st.slider(
         "Yüzey Basıncı (hPa)", 
         min_value=900.0, 
         max_value=1050.0, 
         value=float(st.session_state.user_pressure), 
         step=0.5, 
-        format="%.2f"
+        format="%.2f",
+        key="user_pressure"
     )
 with pressure_btn_col:
     st.markdown("<br>", unsafe_allow_html=True)
-    st.button("Sıfırla", key="reset_pressure", on_click=reset_pressure_to_api)
+    st.button("Sıfırla", key="reset_pressure", on_click=reset_and_fetch_api_data)
 
 
 if st.button("Analiz Yap"):
     try:
-        with st.spinner("Veriler çekiliyor ve analiz yapılıyor..."):
-            hourly_df, current_data = get_weather_data(user_lat, user_lon)
+        # Analiz için gerekli verileri session_state'ten al
+        user_input_data = {
+            'temperature_2m': st.session_state.user_temp,
+            'relative_humidity_2m': st.session_state.user_rh,
+            'pressure_msl': st.session_state.user_pressure
+        }
+        
+        # Sadece analiz için API'den veri çek
+        with st.spinner("Analiz için atmosferik profiller oluşturuluyor..."):
+            hourly_df, _ = get_weather_data(user_lat, user_lon)
+            if hourly_df.empty:
+                st.error("API'den veri alınamadığı için analiz yapılamıyor.")
+                st.stop()
+
+            local_timezone = pytz.timezone('Europe/Istanbul')
+            analysis_time_local = local_timezone.localize(datetime.now().replace(hour=analysis_hour, minute=0, second=0, microsecond=0))
+            analysis_time_utc = analysis_time_local.astimezone(pytz.utc)
+
+            time_diffs = (hourly_df['time'] - analysis_time_utc).abs()
+            closest_hour_idx = time_diffs.argmin()
+            closest_hourly_data = hourly_df.iloc[closest_hour_idx]
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                user_input_data['dew_point_2m'] = dewpoint_from_relative_humidity(
+                    np.array([user_input_data['temperature_2m']]) * units.degC,
+                    np.array([user_input_data['relative_humidity_2m']]) * units.percent
+                ).to('degC').magnitude[0]
+
+            local_time_for_title = closest_hourly_data['time'].astimezone(local_timezone)
             
-            if not hourly_df.empty and current_data:
-                # API'den gelen verileri session_state'e kaydet
-                st.session_state.initial_data = current_data
+            p_profile, temp_profile, dewpoint_profile, wind_speed, wind_direction, rh_profile = create_profiles(closest_hourly_data)
+            
+            p_start = np.array([user_input_data['pressure_msl']]).astype(np.float64) * units.hPa
+            t_start = np.array([user_input_data['temperature_2m']]).astype(np.float64) * units.degC
+            td_start = np.array([user_input_data['dew_point_2m']]).astype(np.float64) * units.degC
+            
+            indices = calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start)
+            
+            st.subheader("3. Meteorolojik İndeksler")
+            if indices:
+                st.write("---")
+                st.markdown(f"**Yükselme İndeksi (LI)**: {indices['li'].magnitude[0]:.2f} °C")
+                if indices['li'].magnitude[0] < 0:
+                    st.info("Negatif değerler **kararsızlığı** gösterir. Fırtına olasılığı artar.")
+                else:
+                    st.info("Pozitif değerler **kararlılığı** gösterir. Fırtına oluşumu beklenmez.")
                 
-                # Slider'ların değerlerini API değerlerine eşitle (ilk defa ya da her analizde)
-                st.session_state.user_temp = current_data.get('temperature_2m', 20.0)
-                st.session_state.user_rh = current_data.get('relative_humidity_2m', 60.0)
-                st.session_state.user_pressure = current_data.get('pressure_msl', 1013.25)
-                
-                analysis_time_local = local_timezone.localize(datetime.now().replace(hour=analysis_hour, minute=0, second=0, microsecond=0))
-                analysis_time_utc = analysis_time_local.astimezone(pytz.utc)
+                st.write("---")
+                st.markdown(f"**K-İndeksi (KI)**: {indices['ki'].magnitude:.2f} °C")
+                if indices['ki'].magnitude >= 30:
+                    st.warning("Değer 30'un üzerinde: Gök gürültülü fırtına olasılığı yüksektir.")
+                elif 20 <= indices['ki'].magnitude < 30:
+                    st.warning("Değer 20-30 arası: Gök gürültülü fırtına olasılığı ortadır.")
+                else:
+                    st.info("Değer 20'nin altında: Gök gürültülü fırtına olasılığı düşüktür.")
 
-                time_diffs = (hourly_df['time'] - analysis_time_utc).abs()
-                closest_hour_idx = time_diffs.argmin()
-                closest_hourly_data = hourly_df.iloc[closest_hour_idx]
-
-                user_input_data = {
-                    'temperature_2m': st.session_state.user_temp,
-                    'relative_humidity_2m': st.session_state.user_rh,
-                    'pressure_msl': st.session_state.user_pressure
-                }
-
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", RuntimeWarning)
-                    user_input_data['dew_point_2m'] = dewpoint_from_relative_humidity(
-                        np.array([user_input_data['temperature_2m']]) * units.degC,
-                        np.array([user_input_data['relative_humidity_2m']]) * units.percent
-                    ).to('degC').magnitude[0]
-
-                local_time_for_title = closest_hourly_data['time'].astimezone(local_timezone)
+                st.write("---")
+                st.markdown(f"**Konvektif Kullanılabilir Potansiyel Enerji (CAPE)**: {indices['cape_sfc'].magnitude:.2f} J/kg")
+                if indices['cape_sfc'].magnitude > 1000:
+                    st.warning(f"Yüksek CAPE ({indices['cape_sfc'].magnitude:.0f} J/kg), güçlü fırtına ve sağanak yağış potansiyeline işaret eder.")
+                else:
+                    st.info(f"Düşük CAPE ({indices['cape_sfc'].magnitude:.0f} J/kg), atmosferin nispeten kararlı olduğunu gösterir.")
                 
-                p_profile, temp_profile, dewpoint_profile, wind_speed, wind_direction, rh_profile = create_profiles(closest_hourly_data)
+                st.write("---")
+                st.markdown(f"**Konvektif Engelleme (CIN)**: {indices['cin_sfc'].magnitude:.2f} J/kg")
+                st.info("CIN, atmosferin fırtına gelişimine karşı koyduğu direnç miktarıdır. Değer ne kadar düşükse, fırtına oluşumu o kadar kolaydır.")
                 
-                p_start = np.array([user_input_data['pressure_msl']]).astype(np.float64) * units.hPa
-                t_start = np.array([user_input_data['temperature_2m']]).astype(np.float64) * units.degC
-                td_start = np.array([user_input_data['dew_point_2m']]).astype(np.float64) * units.degC
-                
-                indices = calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start)
-                
-                st.subheader("3. Meteorolojik İndeksler")
-                if indices:
-                    st.write("---")
-                    st.markdown(f"**Yükselme İndeksi (LI)**: {indices['li'].magnitude[0]:.2f} °C")
-                    if indices['li'].magnitude[0] < 0:
-                        st.info("Negatif değerler **kararsızlığı** gösterir. Fırtına olasılığı artar.")
-                    else:
-                        st.info("Pozitif değerler **kararlılığı** gösterir. Fırtına oluşumu beklenmez.")
-                    
-                    st.write("---")
-                    st.markdown(f"**K-İndeksi (KI)**: {indices['ki'].magnitude:.2f} °C")
-                    if indices['ki'].magnitude >= 30:
-                        st.warning("Değer 30'un üzerinde: Gök gürültülü fırtına olasılığı yüksektir.")
-                    elif 20 <= indices['ki'].magnitude < 30:
-                        st.warning("Değer 20-30 arası: Gök gürültülü fırtına olasılığı ortadır.")
-                    else:
-                        st.info("Değer 20'nin altında: Gök gürültülü fırtına olasılığı düşüktür.")
-
-                    st.write("---")
-                    st.markdown(f"**Konvektif Kullanılabilir Potansiyel Enerji (CAPE)**: {indices['cape_sfc'].magnitude:.2f} J/kg")
-                    if indices['cape_sfc'].magnitude > 1000:
-                        st.warning(f"Yüksek CAPE ({indices['cape_sfc'].magnitude:.0f} J/kg), güçlü fırtına ve sağanak yağış potansiyeline işaret eder.")
-                    else:
-                        st.info(f"Düşük CAPE ({indices['cape_sfc'].magnitude:.0f} J/kg), atmosferin nispeten kararlı olduğunu gösterir.")
-                    
-                    st.write("---")
-                    st.markdown(f"**Konvektif Engelleme (CIN)**: {indices['cin_sfc'].magnitude:.2f} J/kg")
-                    st.info("CIN, atmosferin fırtına gelişimine karşı koyduğu direnç miktarıdır. Değer ne kadar düşükse, fırtına oluşumu o kadar kolaydır.")
-                    
-                    st.subheader("4. Skew-T Diyagramı")
-                    plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])
-                
+                st.subheader("4. Skew-T Diyagramı")
+                plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])
+            
     except Exception as e:
         st.error(f"Analiz sırasında bir hata oluştu: {e}")

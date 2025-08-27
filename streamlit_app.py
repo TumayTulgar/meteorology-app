@@ -95,7 +95,7 @@ def get_weather_data(latitude: float, longitude: float):
         return hourly_df, current_data
 
     except requests.exceptions.RequestException as e:
-        st.error(f"Hata: API'ye bağlanırken bir sorun oluştu. Hata: {e}")
+        st.error(f"Hata: API'ye bağlanırken bir sorun oluştu. Lütfen konum değerlerini veya internet bağlantınızı kontrol edin. Hata: {e}")
         return pd.DataFrame(), {}
     except ValueError as e:
         st.error(f"Hata: Veri işlenirken bir sorun oluştu. Hata: {e}")
@@ -220,17 +220,22 @@ if 'data_fetched' in st.session_state and st.session_state.data_fetched:
     local_timezone = pytz.timezone('Europe/Istanbul')
     current_hour_local = datetime.now(local_timezone).hour
     
-    st.info(f"Yüzey verileri otomatik olarak API'den alınacaktır. Dilerseniz aşağıdan farklı değerler girebilirsiniz.")
-
-    col3, col4, col5, col6 = st.columns(4)
+    st.info(f"Varsayılan yüzey verileri API'den anlık olarak çekildi. İsterseniz kaydırma çubukları ile bu değerleri değiştirebilirsiniz.")
+    
+    # Varsayılan değerler
+    temp_default = st.session_state.current_data.get('temperature_2m', 20.0)
+    rh_default = st.session_state.current_data.get('relative_humidity_2m', 60.0)
+    pressure_default = st.session_state.current_data.get('pressure_msl', 1013.25)
+    
+    col3, col4 = st.columns(2)
     with col3:
-        analysis_hour = st.number_input("Analiz Saati (0-23)", min_value=0, max_value=23, value=current_hour_local)
+        analysis_hour = st.slider("Analiz Saati (0-23)", min_value=0, max_value=23, value=current_hour_local)
+        
     with col4:
-        user_temp = st.number_input(f"Yüzey Sıcaklığı (°C)", format="%.2f", help=f"Varsayılan: {st.session_state.current_data['temperature_2m']:.2f}")
-    with col5:
-        user_rh = st.number_input(f"Yüzey Bağıl Nemi (%)", min_value=0.0, max_value=100.0, format="%.2f", help=f"Varsayılan: {st.session_state.current_data['relative_humidity_2m']:.2f}")
-    with col6:
-        user_pressure = st.number_input(f"Yüzey Basıncı (hPa)", format="%.2f", help=f"Varsayılan: {st.session_state.current_data['pressure_msl']:.2f}")
+        user_pressure = st.slider(f"Yüzey Basıncı (hPa)", min_value=900.0, max_value=1050.0, value=pressure_default, step=0.5, format="%.2f")
+
+    user_temp = st.slider("Yüzey Sıcaklığı (°C)", min_value=-20.0, max_value=50.0, value=temp_default, step=0.1, format="%.1f")
+    user_rh = st.slider("Yüzey Bağıl Nemi (%)", min_value=0.0, max_value=100.0, value=rh_default, step=1.0, format="%.0f")
 
     if st.button("Analiz Yap ve Diyagramı Çiz"):
         try:
@@ -246,9 +251,9 @@ if 'data_fetched' in st.session_state and st.session_state.data_fetched:
                 closest_hourly_data = hourly_df.iloc[closest_hour_idx]
 
                 user_input_data = {}
-                user_input_data['temperature_2m'] = user_temp if user_temp else current_data.get('temperature_2m')
-                user_input_data['relative_humidity_2m'] = user_rh if user_rh else current_data.get('relative_humidity_2m')
-                user_input_data['pressure_msl'] = user_pressure if user_pressure else current_data.get('pressure_msl')
+                user_input_data['temperature_2m'] = user_temp
+                user_input_data['relative_humidity_2m'] = user_rh
+                user_input_data['pressure_msl'] = user_pressure
 
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", RuntimeWarning)
@@ -265,7 +270,6 @@ if 'data_fetched' in st.session_state and st.session_state.data_fetched:
                 t_start = np.array([user_input_data['temperature_2m']]).astype(np.float64) * units.degC
                 td_start = np.array([user_input_data['dew_point_2m']]).astype(np.float64) * units.degC
                 
-                # İndeksleri hesapla
                 indices = calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start, rh_profile)
                 
                 st.subheader("3. Meteorolojik İndeksler")

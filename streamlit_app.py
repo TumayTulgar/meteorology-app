@@ -7,7 +7,6 @@ from metpy.calc import (
     parcel_profile, cape_cin, lcl,
     lifted_index, k_index, dewpoint_from_relative_humidity,
     wind_components,
-    mixing_ratio_from_relative_humidity,
 )
 from metpy.plots import SkewT
 from datetime import datetime
@@ -20,6 +19,7 @@ from streamlit_folium import st_folium
 # MetPy uyarılarını gizle
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='metpy')
 
+# Fonksiyon: API'den veri çekme
 def get_weather_data(latitude: float, longitude: float):
     """
     Open-Meteo API'den atmosferik profil verilerini çeker.
@@ -96,6 +96,7 @@ def get_weather_data(latitude: float, longitude: float):
         st.error(f"Hata: Veri işlenirken bir sorun oluştu. Hata: {e}")
         return pd.DataFrame(), {}
 
+# Fonksiyon: Profil oluşturma
 @st.cache_data(show_spinner=False)
 def create_profiles(hourly_row):
     """
@@ -120,6 +121,7 @@ def create_profiles(hourly_row):
 
     return p_profile, temp_profile, dewpoint_profile, wind_speed, wind_direction, rh_profile
 
+# Fonksiyon: İndeks hesaplama
 def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start):
     """
     Meteorolojik indeksleri hesaplar ve döndürür.
@@ -144,6 +146,7 @@ def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_star
         st.error(f"İndeks hesaplamalarında bir hata oluştu: {e}")
         return None
 
+# Fonksiyon: Skew-T diyagramı çizme
 def plot_skewt(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile, wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_pressure_msl):
     """
     Skew-T diyagramını oluşturur.
@@ -175,6 +178,22 @@ def plot_skewt(p_profile, temp_profile, dewpoint_profile, parcel_temp_profile, w
 
     st.pyplot(fig)
 
+# Fonksiyon: Sıcaklık değerini API'den gelen değere eşitle
+def reset_temp_to_api():
+    if 'initial_data' in st.session_state:
+        st.session_state.user_temp = st.session_state.initial_data.get('temperature_2m', 20.0)
+
+# Fonksiyon: Bağıl nem değerini API'den gelen değere eşitle
+def reset_rh_to_api():
+    if 'initial_data' in st.session_state:
+        st.session_state.user_rh = st.session_state.initial_data.get('relative_humidity_2m', 60.0)
+
+# Fonksiyon: Basınç değerini API'den gelen değere eşitle
+def reset_pressure_to_api():
+    if 'initial_data' in st.session_state:
+        st.session_state.user_pressure = st.session_state.initial_data.get('pressure_msl', 1013.25)
+
+
 # Streamlit Arayüzü
 st.title("Atmosferik Profil ve Fırtına Analiz Aracı ⛈️")
 st.markdown("""
@@ -183,8 +202,7 @@ Bu araç, Open-Meteo API'sinden alınan atmosferik verileri kullanarak **Skew-T 
 
 st.subheader("1. Konum ve Zaman Bilgileri")
 
-# Haritayı oluştur ve koordinatları al
-initial_coords = [40.90, 27.47] # Tekirdağ, Türkiye varsayılan koordinatları
+initial_coords = [40.90, 27.47]
 if 'coords' not in st.session_state:
     st.session_state.coords = initial_coords
 
@@ -215,20 +233,58 @@ analysis_hour = int(analysis_time_str.split(':')[0])
 st.subheader("2. Yüzey Parametreleri (İsteğe Bağlı)")
 
 # Varsayılan değerler
-temp_default = 20.0
-rh_default = 60.0
-pressure_default = 1013.25
+if 'user_temp' not in st.session_state:
+    st.session_state.user_temp = 20.0
+if 'user_rh' not in st.session_state:
+    st.session_state.user_rh = 60.0
+if 'user_pressure' not in st.session_state:
+    st.session_state.user_pressure = 1013.25
 
-if 'initial_data' in st.session_state:
-    temp_default = st.session_state.initial_data.get('temperature_2m', 20.0)
-    rh_default = st.session_state.initial_data.get('relative_humidity_2m', 60.0)
-    pressure_default = st.session_state.initial_data.get('pressure_msl', 1013.25)
-    
-st.info("Kaydırma çubukları ile yüzey verilerini değiştirebilirsiniz. Değiştirmezseniz, otomatik olarak API verileri kullanılacaktır.")
+st.info("Kaydırma çubukları ile yüzey verilerini değiştirebilirsiniz. Her bir parametreyi API'den gelen değere döndürmek için yandaki butona basın.")
 
-user_temp = st.slider("Yüzey Sıcaklığı (°C)", min_value=-20.0, max_value=50.0, value=float(temp_default), step=0.1, format="%.1f")
-user_rh = st.slider("Yüzey Bağıl Nemi (%)", min_value=0.0, max_value=100.0, value=float(rh_default), step=1.0, format="%.0f")
-user_pressure = st.slider(f"Yüzey Basıncı (hPa)", min_value=900.0, max_value=1050.0, value=float(pressure_default), step=0.5, format="%.2f")
+# Her bir parametre için slider ve butonu yan yana koy
+temp_col, temp_btn_col = st.columns([0.7, 0.3])
+with temp_col:
+    st.session_state.user_temp = st.slider(
+        "Yüzey Sıcaklığı (°C)", 
+        min_value=-20.0, 
+        max_value=50.0, 
+        value=float(st.session_state.user_temp), 
+        step=0.1, 
+        format="%.1f"
+    )
+with temp_btn_col:
+    st.markdown("<br>", unsafe_allow_html=True)  # Hizalama için
+    st.button("Sıfırla", key="reset_temp", on_click=reset_temp_to_api)
+
+rh_col, rh_btn_col = st.columns([0.7, 0.3])
+with rh_col:
+    st.session_state.user_rh = st.slider(
+        "Yüzey Bağıl Nemi (%)", 
+        min_value=0.0, 
+        max_value=100.0, 
+        value=float(st.session_state.user_rh), 
+        step=1.0, 
+        format="%.0f"
+    )
+with rh_btn_col:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.button("Sıfırla", key="reset_rh", on_click=reset_rh_to_api)
+
+pressure_col, pressure_btn_col = st.columns([0.7, 0.3])
+with pressure_col:
+    st.session_state.user_pressure = st.slider(
+        "Yüzey Basıncı (hPa)", 
+        min_value=900.0, 
+        max_value=1050.0, 
+        value=float(st.session_state.user_pressure), 
+        step=0.5, 
+        format="%.2f"
+    )
+with pressure_btn_col:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.button("Sıfırla", key="reset_pressure", on_click=reset_pressure_to_api)
+
 
 if st.button("Analiz Yap"):
     try:
@@ -236,8 +292,14 @@ if st.button("Analiz Yap"):
             hourly_df, current_data = get_weather_data(user_lat, user_lon)
             
             if not hourly_df.empty and current_data:
+                # API'den gelen verileri session_state'e kaydet
                 st.session_state.initial_data = current_data
-
+                
+                # Slider'ların değerlerini API değerlerine eşitle (ilk defa ya da her analizde)
+                st.session_state.user_temp = current_data.get('temperature_2m', 20.0)
+                st.session_state.user_rh = current_data.get('relative_humidity_2m', 60.0)
+                st.session_state.user_pressure = current_data.get('pressure_msl', 1013.25)
+                
                 analysis_time_local = local_timezone.localize(datetime.now().replace(hour=analysis_hour, minute=0, second=0, microsecond=0))
                 analysis_time_utc = analysis_time_local.astimezone(pytz.utc)
 
@@ -246,9 +308,9 @@ if st.button("Analiz Yap"):
                 closest_hourly_data = hourly_df.iloc[closest_hour_idx]
 
                 user_input_data = {
-                    'temperature_2m': user_temp,
-                    'relative_humidity_2m': user_rh,
-                    'pressure_msl': user_pressure
+                    'temperature_2m': st.session_state.user_temp,
+                    'relative_humidity_2m': st.session_state.user_rh,
+                    'pressure_msl': st.session_state.user_pressure
                 }
 
                 with warnings.catch_warnings():

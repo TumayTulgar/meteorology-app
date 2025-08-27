@@ -8,7 +8,6 @@ from metpy.calc import (
     lifted_index, k_index, dewpoint_from_relative_humidity,
     wind_components,
     mixing_ratio_from_relative_humidity,
-    galvez_davison_index
 )
 from metpy.plots import SkewT
 from datetime import datetime
@@ -119,7 +118,7 @@ def create_profiles(hourly_row):
 
     return p_profile, temp_profile, dewpoint_profile, wind_speed, wind_direction, rh_profile
 
-def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start, rh_profile):
+def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start):
     """
     Meteorolojik indeksleri hesaplar ve döndürür.
     """
@@ -129,8 +128,6 @@ def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_star
         li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
         ki = k_index(p_profile, temp_profile, dewpoint_profile)
         cape_sfc, cin_sfc = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_profile=parcel_temp_profile)
-        mixrat_profile = mixing_ratio_from_relative_humidity(p_profile, temp_profile, rh_profile)
-        gdi = galvez_davison_index(p_profile, temp_profile, mixrat_profile, p_start[0])
 
         return {
             'lcl_pressure': lcl_pressure,
@@ -139,8 +136,7 @@ def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_star
             'li': li,
             'ki': ki,
             'cape_sfc': cape_sfc,
-            'cin_sfc': cin_sfc,
-            'gdi': gdi
+            'cin_sfc': cin_sfc
         }
     except Exception as e:
         st.error(f"İndeks hesaplamalarında bir hata oluştu: {e}")
@@ -193,11 +189,14 @@ with st.container():
 
 local_timezone = pytz.timezone('Europe/Istanbul')
 current_hour_local = datetime.now(local_timezone).hour
-analysis_hour = st.slider("Analiz Saati (0-23)", min_value=0, max_value=23, value=current_hour_local)
+hour_options = [f"{h:02d}:00" for h in range(14, 24)]
+default_hour_str = f"{current_hour_local:02d}:00" if 14 <= current_hour_local <= 23 else "14:00"
+analysis_time_str = st.selectbox("Analiz Saati", options=hour_options, index=hour_options.index(default_hour_str))
+analysis_hour = int(analysis_time_str.split(':')[0])
 
 st.subheader("2. Yüzey Parametreleri (İsteğe Bağlı)")
 
-# Başlangıçta boş veya varsayılan değerler
+# Varsayılan değerler
 temp_default = 20.0
 rh_default = 60.0
 pressure_default = 1013.25
@@ -220,7 +219,6 @@ if st.button("Analiz Yap"):
             hourly_df, current_data = get_weather_data(user_lat, user_lon)
             
             if not hourly_df.empty and current_data:
-                # API'den gelen verileri kaydet, sonraki işlemler için
                 st.session_state.initial_data = current_data
 
                 analysis_time_local = local_timezone.localize(datetime.now().replace(hour=analysis_hour, minute=0, second=0, microsecond=0))
@@ -251,7 +249,7 @@ if st.button("Analiz Yap"):
                 t_start = np.array([user_input_data['temperature_2m']]).astype(np.float64) * units.degC
                 td_start = np.array([user_input_data['dew_point_2m']]).astype(np.float64) * units.degC
                 
-                indices = calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start, rh_profile)
+                indices = calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start)
                 
                 st.subheader("3. Meteorolojik İndeksler")
                 if indices:
@@ -282,22 +280,6 @@ if st.button("Analiz Yap"):
                     st.markdown(f"**Konvektif Engelleme (CIN)**: {indices['cin_sfc'].magnitude:.2f} J/kg")
                     st.info("CIN, atmosferin fırtına gelişimine karşı koyduğu direnç miktarıdır. Değer ne kadar düşükse, fırtına oluşumu o kadar kolaydır.")
                     
-                    st.write("---")
-                    st.markdown(f"**Galvez-Davison İndeksi (GDI)**: {indices['gdi'].magnitude:.2f}")
-                    gdi_val = indices['gdi'].magnitude
-                    if gdi_val >= 45:
-                        st.warning("Beklenen Konvektif Rejim: Yer yer şiddetli gök gürültülü sağanak yağış bekleniyor.")
-                    elif 35 <= gdi_val < 45:
-                        st.info("Beklenen Konvektif Rejim: Yer yer gök gürültülü sağanak yağışlar ve/veya yer yer geniş alana yayılmış sağanak yağışlar.")
-                    elif 25 <= gdi_val < 35:
-                        st.info("Beklenen Konvektif Rejim: Sadece yer yer gök gürültülü sağanak yağışlar ve/veya yer yer sağanak yağışlar.")
-                    elif 15 <= gdi_val < 25:
-                        st.info("Beklenen Konvektif Rejim: İzole gök gürültülü sağanak yağışlar ve/veya izole sağanak yağışlar.")
-                    elif 5 <= gdi_val < 15:
-                        st.info("Beklenen Konvektif Rejim: Yer yer sağanak yağışlı.")
-                    else:
-                        st.info("Beklenen Konvektif Rejim: Kuvvetli TWI muhtemel, hafif yağmur mümkün.")
-
                     st.subheader("4. Skew-T Diyagramı")
                     plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])
                 

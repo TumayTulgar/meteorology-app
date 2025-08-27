@@ -25,8 +25,7 @@ def get_weather_data(latitude: float, longitude: float):
     Open-Meteo API'den atmosferik profil verilerini çeker.
     """
     try:
-        url = "https://api.open-mete
-o.com/v1/forecast"
+       url = "https://api.open-meteo.com/v1/forecast"
         hourly_variables = [
             "temperature_1000hPa", "relative_humidity_1000hPa", "geopotential_height_1000hPa",
             "temperature_975hPa", "relative_humidity_975hPa", "geopotential_height_975hPa",

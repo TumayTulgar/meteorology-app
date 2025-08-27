@@ -348,31 +348,54 @@ if st.button("Analiz Yap"):
             st.subheader("3. Meteorolojik İndeksler")
             if indices:
                 st.write("---")
-                st.markdown(f"**Yükselme İndeksi (LI)**: {indices['li'].magnitude[0]:.2f} °C")
-                if indices['li'].magnitude[0] < 0:
+                
+                # Yükselme İndeksi (LI)
+                li_value = indices['li'].magnitude[0]
+                st.markdown(f"**Yükselme İndeksi (LI)**: {li_value:.2f} °C")
+                if li_value < 0:
                     st.info("Negatif değerler **kararsızlığı** gösterir. Fırtına olasılığı artar.")
                 else:
-                    st.info("Pozitif değerler **kararlılığı** gösterir. Fırtına oluşumu beklenmez.")
-                
-                st.write("---")
-                st.markdown(f"**K-İndeksi (KI)**: {indices['ki'].magnitude:.2f} °C")
-                if indices['ki'].magnitude >= 30:
-                    st.warning("Değer 30'un üzerinde: Gök gürültülü fırtına olasılığı yüksektir.")
-                elif 20 <= indices['ki'].magnitude < 30:
-                    st.warning("Değer 20-30 arası: Gök gürültülü fırtına olasılığı ortadır.")
-                else:
-                    st.info("Değer 20'nin altında: Gök gürültülü fırtına olasılığı düşüktür.")
+                    st.success("Pozitif değerler **kararlılığı** gösterir. Fırtına oluşumu beklenmez.")
 
                 st.write("---")
-                st.markdown(f"**Konvektif Kullanılabilir Potansiyel Enerji (CAPE)**: {indices['cape_sfc'].magnitude:.2f} J/kg")
-                if indices['cape_sfc'].magnitude > 1000:
-                    st.warning(f"Yüksek CAPE ({indices['cape_sfc'].magnitude:.0f} J/kg), güçlü fırtına ve sağanak yağış potansiyeline işaret eder.")
+
+                # K-İndeksi (KI)
+                ki_value = indices['ki'].magnitude
+                st.markdown(f"**K-İndeksi (KI)**: {ki_value:.2f} °C")
+                if ki_value >= 35:
+                    st.error("Çok Yüksek Fırtına Potansiyeli. Çok kuvvetli yağış ve fırtına ihtimali yüksek.")
+                elif ki_value >= 25:
+                    st.warning("Yüksek Fırtına Potansiyeli. Gök gürültülü fırtına ve sağanak yağış ihtimali var.")
+                elif ki_value >= 15:
+                    st.info("Orta Fırtına Potansiyeli. Hafif gök gürültülü fırtına görülebilir.")
                 else:
-                    st.info(f"Düşük CAPE ({indices['cape_sfc'].magnitude:.0f} J/kg), atmosferin nispeten kararlı olduğunu gösterir.")
-                
+                    st.success("Düşük Fırtına Potansiyeli.")
+
                 st.write("---")
-                st.markdown(f"**Konvektif Engelleme (CIN)**: {indices['cin_sfc'].magnitude:.2f} J/kg")
-                st.info("CIN, atmosferin fırtına gelişimine karşı koyduğu direnç miktarıdır. Değer ne kadar düşükse, fırtına oluşumu o kadar kolaydır.")
+
+                # Konvektif Kullanılabilir Potansiyel Enerji (CAPE)
+                cape_value = indices['cape_sfc'].magnitude
+                st.markdown(f"**Konvektif Kullanılabilir Potansiyel Enerji (CAPE)**: {cape_value:.2f} J/kg")
+                if cape_value > 3000:
+                    st.error(f"Çok Yüksek CAPE. Çok şiddetli fırtına, dolu ve fırtına rüzgarları gibi tehlikeler görülebilir.")
+                elif cape_value > 1500:
+                    st.warning(f"Yüksek CAPE. Şiddetli gök gürültülü fırtına ihtimali mevcut.")
+                elif cape_value > 500:
+                    st.info(f"Orta CAPE. Gök gürültülü fırtına olasılığı mevcut.")
+                else:
+                    st.success(f"Düşük CAPE. Fırtına potansiyeli düşüktür.")
+
+                st.write("---")
+
+                # Konvektif Engelleme (CIN)
+                cin_value = indices['cin_sfc'].magnitude
+                st.markdown(f"**Konvektif Engelleme (CIN)**: {cin_value:.2f} J/kg")
+                if cin_value > 200:
+                    st.success("Yüksek Engelleme. Fırtına oluşumu zorlaşır.")
+                elif cin_value > 50:
+                    st.info("Orta Engelleme. Fırtına oluşumu için daha güçlü bir tetikleyici gerekebilir.")
+                else:
+                    st.error("Düşük Engelleme. Atmosfer kolayca kararsız hale gelebilir ve fırtına oluşumu kolaylaşır.")
                 
                 st.subheader("4. Skew-T Diyagramı")
                 plot_skewt(p_profile, temp_profile, dewpoint_profile, indices['parcel_temp_profile'], wind_speed, wind_direction, user_lat, user_lon, local_time_for_title, user_input_data['pressure_msl'])

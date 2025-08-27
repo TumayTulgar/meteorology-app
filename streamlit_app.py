@@ -28,6 +28,10 @@ def get_weather_data(latitude: float, longitude: float):
     try:
         url = "https://api.open-meteo.com/v1/forecast"
         hourly_variables = [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "dew_point_2m",
+            "pressure_msl",
             "temperature_1000hPa", "relative_humidity_1000hPa", "geopotential_height_1000hPa",
             "temperature_975hPa", "relative_humidity_975hPa", "geopotential_height_975hPa",
             "temperature_950hPa", "relative_humidity_950hPa", "geopotential_height_950hPa",
@@ -65,7 +69,7 @@ def get_weather_data(latitude: float, longitude: float):
             "wind_speed_100hPa", "wind_direction_100hPa",
             "wind_speed_70hPa", "wind_direction_70hPa",
             "wind_speed_50hPa", "wind_direction_50hPa",
-            "wind_direction_850hPa", "pressure_msl",
+            "wind_direction_850hPa",
             "wind_direction_30hPa"
         ]
         params = {

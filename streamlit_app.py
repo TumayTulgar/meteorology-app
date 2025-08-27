@@ -25,7 +25,7 @@ def get_weather_data(latitude: float, longitude: float):
     Open-Meteo API'den atmosferik profil verilerini çeker.
     """
     try:
-       url = "https://api.open-meteo.com/v1/forecast"
+        url = "https://api.open-meteo.com/v1/forecast"
         hourly_variables = [
             "temperature_1000hPa", "relative_humidity_1000hPa", "geopotential_height_1000hPa",
             "temperature_975hPa", "relative_humidity_975hPa", "geopotential_height_975hPa",
@@ -203,15 +203,10 @@ def reset_and_fetch_api_data():
         closest_hour_idx = time_diffs.argmin()
         closest_hourly_data = hourly_df.iloc[closest_hour_idx]
 
-        # Yüzey parametrelerini en yakın saate ait API verileriyle güncelle
-        st.session_state.user_temp = closest_hourly_data.get('temperature_1000hPa', 20.0)
-        st.session_state.user_rh = closest_hourly_data.get('relative_humidity_1000hPa', 60.0)
-        st.session_state.user_pressure = 1000.0 # Open-Meteo 1000hPa'yı yüzey olarak kabul ediyor
-
-        # Ek bilgi: Eğer 2m sıcaklık istersen
-        # st.session_state.user_temp = current_data.get('temperature_2m', 20.0)
-        # st.session_state.user_rh = current_data.get('relative_humidity_2m', 60.0)
-        # st.session_state.user_pressure = current_data.get('pressure_msl', 1013.25)
+        # Yüzey parametrelerini 2m'lik (güncel) API verileriyle güncelle
+        st.session_state.user_temp = current_data.get('temperature_2m', 20.0)
+        st.session_state.user_rh = current_data.get('relative_humidity_2m', 60.0)
+        st.session_state.user_pressure = current_data.get('pressure_msl', 1013.25)
 
 
 # Streamlit Arayüzü
@@ -265,7 +260,7 @@ st.info("Kaydırma çubukları ile yüzey verilerini değiştirebilirsiniz. Herh
 # Her bir parametre için slider ve butonu yan yana koy
 temp_col, temp_btn_col = st.columns([0.7, 0.3])
 with temp_col:
-    user_temp = st.slider(
+    st.slider(
         "Yüzey Sıcaklığı (°C)", 
         min_value=-20.0, 
         max_value=50.0, 
@@ -280,7 +275,7 @@ with temp_btn_col:
 
 rh_col, rh_btn_col = st.columns([0.7, 0.3])
 with rh_col:
-    user_rh = st.slider(
+    st.slider(
         "Yüzey Bağıl Nemi (%)", 
         min_value=0.0, 
         max_value=100.0, 
@@ -295,7 +290,7 @@ with rh_btn_col:
 
 pressure_col, pressure_btn_col = st.columns([0.7, 0.3])
 with pressure_col:
-    user_pressure = st.slider(
+    st.slider(
         "Yüzey Basıncı (hPa)", 
         min_value=900.0, 
         max_value=1050.0, 

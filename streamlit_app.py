@@ -29,7 +29,7 @@ def get_weather_data(latitude: float, longitude: float):
     Open-Meteo API'den atmosferik profil verilerini çeker.
     """
     try:
-        url = "https://api.open-meteo.com/v1/forecast"
+        url = "https://api.open-meteors.com/v1/forecast"
         hourly_variables = [
             "temperature_2m", "relative_humidity_2m", "dew_point_2m", "pressure_msl",
             "temperature_1000hPa", "relative_humidity_1000hPa", "geopotential_height_1000hPa",
@@ -125,7 +125,7 @@ def create_profiles(hourly_row):
     return p_profile, temp_profile, dewpoint_profile, wind_speed, wind_direction, rh_profile
 
 # Fonksiyon: İndeks hesaplama
-def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start):
+def calculate_indices(p_profile, temp_profile, dewpoint_profile, rh_profile, p_start, t_start, td_start):
     """
     Meteorolojik indeksleri hesaplar ve döndürür.
     """
@@ -141,7 +141,13 @@ def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_star
         # Diğer indekslerin hesaplanması
         li = lifted_index(p_profile, temp_profile, parcel_temp_profile)
         ki = k_index(p_profile, temp_profile, dewpoint_profile)
-        mixrat_profile = mixing_ratio_from_relative_humidity(p_profile, temp_profile, dewpoint_profile)
+        
+        # Hata Düzeltme: rh_profile değişkeni artık parametre olarak geliyor.
+        mixrat_profile = mixing_ratio_from_relative_humidity(
+            p_profile, 
+            temp_profile, 
+            rh_profile
+        )
         gdi = galvez_davison_index(p_profile, temp_profile, mixrat_profile, p_start[0])
 
         return {
@@ -218,6 +224,13 @@ def reset_and_fetch_api_data():
         time_diffs = (hourly_df['time'] - analysis_time_utc).abs()
         closest_hour_idx = time_diffs.argmin()
         closest_hourly_data = hourly_df.iloc[closest_hour_idx]
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            user_input_data['dew_point_2m'] = dewpoint_from_relative_humidity(
+                np.array([user_input_data['temperature_2m']]) * units.degC,
+                np.array([user_input_data['relative_humidity_2m']]) * units.percent
+            ).to('degC').magnitude[0]
 
         # Yüzey parametrelerini seçili saate ait verilerle güncelle
         st.session_state.user_temp = closest_hourly_data.get('temperature_2m', 20.0)
@@ -359,7 +372,8 @@ if st.button("Analiz Yap"):
             t_start = np.array([user_input_data['temperature_2m']]).astype(np.float64) * units.degC
             td_start = np.array([user_input_data['dew_point_2m']]).astype(np.float64) * units.degC
             
-            indices = calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_start, td_start)
+            # Düzeltme: rh_profile'ı da calculate_indices fonksiyonuna gönderiyoruz
+            indices = calculate_indices(p_profile, temp_profile, dewpoint_profile, rh_profile, p_start, t_start, td_start)
 
             st.subheader("3. Fırtına Potansiyeli Göstergeleri")
 

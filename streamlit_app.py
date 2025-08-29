@@ -27,7 +27,7 @@ def get_weather_data(latitude: float, longitude: float):
     Open-Meteo API'den atmosferik profil verilerini çeker.
     """
     try:
-        url = "https://api.open-meteo.com/v1/forecast"
+        url = "https://api.open-mete.com/v1/forecast"
         hourly_variables = [
             "temperature_2m",
             "relative_humidity_2m",
@@ -418,7 +418,7 @@ if st.button("Analiz Yap"):
                         li_index = p_profiles_magnitude.index(500.0)
                         li_value = li_values[li_index]
                     except ValueError:
-                        li_value = None
+                        st.warning("Uyarı: 500 hPa seviyesi API verilerinde bulunamadığı için Yükselme İndeksi (LI) gösterilemiyor.")
                     
                     fig_li = go.Figure(go.Indicator(
                         mode="gauge+number",

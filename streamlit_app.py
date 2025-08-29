@@ -7,6 +7,7 @@ from metpy.calc import (
     parcel_profile, cape_cin, lcl,
     lifted_index, k_index, dewpoint_from_relative_humidity,
     wind_components,
+    water_latent_heat_vaporization # Yeni eklenen fonksiyon
 )
 from metpy.plots import SkewT
 from datetime import datetime
@@ -15,7 +16,7 @@ import pytz
 import warnings
 import folium
 from streamlit_folium import st_folium
-import plotly.graph_objects as go 
+import plotly.graph_objects as go
 
 # MetPy uyarılarını gizle
 warnings.filterwarnings("ignore", category=RuntimeWarning, module='metpy')
@@ -69,9 +70,9 @@ def get_weather_data(latitude: float, longitude: float):
             "wind_speed_100hPa", "wind_direction_100hPa",
             "wind_speed_70hPa", "wind_direction_70hPa",
             "wind_speed_50hPa", "wind_direction_50hPa",
-            "wind_direction_850hPa",
             "wind_direction_30hPa"
         ]
+        
         params = {
             "latitude": latitude,
             "longitude": longitude,
@@ -137,6 +138,9 @@ def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_star
         ki = k_index(p_profile, temp_profile, dewpoint_profile)
         cape_sfc, cin_sfc = cape_cin(p_profile, temp_profile, dewpoint_profile, parcel_profile=parcel_temp_profile)
 
+        # Yeni Eklenen Kod: Gizli ısı hesaplaması
+        latent_heat_value = water_latent_heat_vaporization(t_start[0])
+
         return {
             'lcl_pressure': lcl_pressure,
             'lcl_temperature': lcl_temperature,
@@ -144,7 +148,8 @@ def calculate_indices(p_profile, temp_profile, dewpoint_profile, p_start, t_star
             'li': li,
             'ki': ki,
             'cape_sfc': cape_sfc,
-            'cin_sfc': cin_sfc
+            'cin_sfc': cin_sfc,
+            'latent_heat': latent_heat_value # Gizli ısıyı sözlüğe ekle
         }
     except Exception as e:
         st.error(f"İndeks hesaplamalarında bir hata oluştu: {e}")
@@ -207,6 +212,13 @@ def reset_and_fetch_api_data():
         closest_hour_idx = time_diffs.argmin()
         closest_hourly_data = hourly_df.iloc[closest_hour_idx]
 
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            user_input_data['dew_point_2m'] = dewpoint_from_relative_humidity(
+                np.array([user_input_data['temperature_2m']]) * units.degC,
+                np.array([user_input_data['relative_humidity_2m']]) * units.percent
+            ).to('degC').magnitude[0]
+
         # Yüzey parametrelerini seçili saate ait verilerle güncelle
         st.session_state.user_temp = closest_hourly_data.get('temperature_2m', 20.0)
         st.session_state.user_rh = closest_hourly_data.get('relative_humidity_2m', 60.0)
@@ -265,26 +277,26 @@ st.info("Kaydırma çubukları ile yüzey verilerini değiştirebilirsiniz. Herh
 temp_col, temp_btn_col = st.columns([0.7, 0.3])
 with temp_col:
     st.slider(
-        "Yüzey Sıcaklığı (°C)", 
-        min_value=-20.0, 
-        max_value=50.0, 
-        value=float(st.session_state.user_temp), 
-        step=0.1, 
+        "Yüzey Sıcaklığı (°C)",
+        min_value=-20.0,
+        max_value=50.0,
+        value=float(st.session_state.user_temp),
+        step=0.1,
         format="%.1f",
         key="user_temp"
     )
 with temp_btn_col:
-    st.markdown("<br>", unsafe_allow_html=True)  # Hizalama için
+    st.markdown("<br>", unsafe_allow_html=True) # Hizalama için
     st.button("Sıfırla", key="reset_temp", on_click=reset_and_fetch_api_data)
 
 rh_col, rh_btn_col = st.columns([0.7, 0.3])
 with rh_col:
     st.slider(
-        "Yüzey Bağıl Nemi (%)", 
-        min_value=0.0, 
-        max_value=100.0, 
-        value=float(st.session_state.user_rh), 
-        step=1.0, 
+        "Yüzey Bağıl Nemi (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=float(st.session_state.user_rh),
+        step=1.0,
         format="%.0f",
         key="user_rh"
     )
@@ -295,11 +307,11 @@ with rh_btn_col:
 pressure_col, pressure_btn_col = st.columns([0.7, 0.3])
 with pressure_col:
     st.slider(
-        "Yüzey Basıncı (hPa)", 
-        min_value=900.0, 
-        max_value=1050.0, 
-        value=float(st.session_state.user_pressure), 
-        step=0.5, 
+        "Yüzey Basıncı (hPa)",
+        min_value=900.0,
+        max_value=1050.0,
+        value=float(st.session_state.user_pressure),
+        step=0.5,
         format="%.2f",
         key="user_pressure"
     )
@@ -353,15 +365,25 @@ if st.button("Analiz Yap"):
 
             if indices:
                 # Kolonlar oluşturma
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4, col5 = st.columns(5)
+                
+                # Gizli Isı Göstergesi
+                with col1:
+                    latent_heat_value = indices['latent_heat'].to('kJ/kg').magnitude
+                    fig_lh = go.Figure(go.Indicator(
+                        mode="number",
+                        value=latent_heat_value,
+                        title={'text': "Gizli Isı<br>(kJ/kg)"},
+                        domain={'x': [0, 1], 'y': [0, 1]}))
+                    st.plotly_chart(fig_lh, use_container_width=True)
 
                 # KI Göstergesi
-                with col1:
+                with col2:
                     ki_value = indices['ki'].magnitude
                     fig_ki = go.Figure(go.Indicator(
                         mode="gauge+number",
                         value=ki_value,
-                        title={'text': "K-İndeksi"},
+                        title={'text': "KI"},
                         domain={'x': [0, 1], 'y': [0, 1]},
                         gauge={
                             'axis': {'range': [None, 50], 'tickwidth': 1},
@@ -374,7 +396,7 @@ if st.button("Analiz Yap"):
                     st.plotly_chart(fig_ki, use_container_width=True)
 
                 # CAPE Göstergesi
-                with col2:
+                with col3:
                     cape_value = indices['cape_sfc'].magnitude
                     fig_cape = go.Figure(go.Indicator(
                         mode="gauge+number",
@@ -392,7 +414,7 @@ if st.button("Analiz Yap"):
                     st.plotly_chart(fig_cape, use_container_width=True)
                 
                 # CIN Göstergesi
-                with col3:
+                with col4:
                     cin_value = indices['cin_sfc'].magnitude
                     fig_cin = go.Figure(go.Indicator(
                         mode="gauge+number",
@@ -407,23 +429,61 @@ if st.button("Analiz Yap"):
                                 {'range': [50, 200], 'color': "yellow"},
                                 {'range': [200, 300], 'color': "green"}]}))
                     st.plotly_chart(fig_cin, use_container_width=True)
+                
+                # LI Göstergesi
+                with col5:
+                    li_values = indices['li'].magnitude
+                    p_profiles_magnitude = p_profile.magnitude.tolist()
+                    li_value = None
+                    try:
+                        li_index = p_profiles_magnitude.index(500.0)
+                        li_value = li_values[li_index]
+                    except ValueError:
+                        li_value = None
+                    
+                    fig_li = go.Figure(go.Indicator(
+                        mode="gauge+number",
+                        value=li_value if li_value is not None else np.nan,
+                        title={'text': "LI"},
+                        domain={'x': [0, 1], 'y': [0, 1]},
+                        gauge={
+                            'axis': {'range': [-12, 8], 'tickwidth': 1},
+                            'bar': {'color': "darkblue"},
+                            'steps': [
+                                {'range': [-12, -4], 'color': "red"},
+                                {'range': [-4, 0], 'color': "orange"},
+                                {'range': [0, 4], 'color': "yellow"},
+                                {'range': [4, 8], 'color': "green"}]}))
+                    st.plotly_chart(fig_li, use_container_width=True)
 
 
             st.write("---")
 
             st.subheader("4. Detaylı Meteorolojik İndeksler")
             if indices:
-                # Yükselme İndeksi (LI)
-                li_value = indices['li'].magnitude[0]
-                st.markdown(f"**Yükselme İndeksi (LI)**: {li_value:.2f} °C")
-                if li_value < 0:
-                    st.info("Negatif değerler **kararsızlığı** gösterir. Fırtına olasılığı artar.")
-                else:
-                    st.success("Pozitif değerler **kararlılığı** gösterir. Fırtına oluşumu beklenmez.")
+                # Gizli ısı değerini göster
+                latent_heat_value = indices['latent_heat'].to('kJ/kg').magnitude
+                st.markdown(f"**Gizli Isı (Latent Heat)**: {latent_heat_value:.2f} kJ/kg")
+                st.info("Bu değer, su buharının buharlaşma sırasında depoladığı ve yoğunlaşma sırasında atmosfere geri bıraktığı potansiyel enerjiyi gösterir. Fırtına oluşumu için önemli bir enerji kaynağıdır.")
+                st.write("---")
 
+                # Yükselme İndeksi (LI)
+                li_value = None
+                try:
+                    p_profiles_magnitude = p_profile.magnitude.tolist()
+                    li_index = p_profiles_magnitude.index(500.0)
+                    li_value = indices['li'].magnitude[li_index]
+                    st.markdown(f"**Yükselme İndeksi (LI)**: {li_value:.2f} °C")
+                    if li_value < 0:
+                        st.info("Negatif değerler **kararsızlığı** gösterir. Fırtına olasılığı artar.")
+                    else:
+                        st.success("Pozitif değerler **kararlılığı** gösterir. Fırtına oluşumu beklenmez.")
+                except (ValueError, IndexError):
+                    st.warning("Uyarı: 500 hPa seviyesi API verilerinde bulunamadığı için Yükselme İndeksi (LI) gösterilemiyor.")
                 st.write("---")
 
                 # K-İndeksi (KI)
+                ki_value = indices['ki'].magnitude
                 st.markdown(f"**K-İndeksi (KI)**: {ki_value:.2f} °C")
                 if ki_value >= 35:
                     st.error("Çok Yüksek Fırtına Potansiyeli. Çok kuvvetli yağış ve fırtına ihtimali yüksek.")
@@ -433,7 +493,6 @@ if st.button("Analiz Yap"):
                     st.info("Orta Fırtına Potansiyeli. Hafif gök gürültülü fırtına görülebilir.")
                 else:
                     st.success("Düşük Fırtına Potansiyeli.")
-
                 st.write("---")
 
                 # Konvektif Kullanılabilir Potansiyel Enerji (CAPE)
@@ -447,7 +506,6 @@ if st.button("Analiz Yap"):
                     st.info(f"Orta CAPE. Gök gürültülü fırtına olasılığı mevcut.")
                 else:
                     st.success(f"Düşük CAPE. Fırtına potansiyeli düşüktür.")
-
                 st.write("---")
 
                 # Konvektif Engelleme (CIN)

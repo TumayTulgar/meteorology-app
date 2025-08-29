@@ -27,55 +27,52 @@ def get_weather_data(latitude: float, longitude: float):
     """
     try:
         url = "https://api.open-meteo.com/v1/forecast"
+        
+        # Kullanıcının sağladığı URL'deki tüm saatlik değişkenler eklendi.
         hourly_variables = [
-            "temperature_2m",
-            "relative_humidity_2m",
-            "dew_point_2m",
-            "pressure_msl",
-            "temperature_1000hPa", "relative_humidity_1000hPa", "geopotential_height_1000hPa",
-            "temperature_975hPa", "relative_humidity_975hPa", "geopotential_height_975hPa",
-            "temperature_950hPa", "relative_humidity_950hPa", "geopotential_height_950hPa",
-            "temperature_925hPa", "relative_humidity_925hPa", "geopotential_height_925hPa",
-            "temperature_900hPa", "relative_humidity_900hPa", "geopotential_height_900hPa",
-            "temperature_850hPa", "relative_humidity_850hPa", "geopotential_height_850hPa",
-            "temperature_800hPa", "relative_humidity_800hPa", "geopotential_height_800hPa",
-            "temperature_700hPa", "relative_humidity_700hPa", "geopotential_height_700hPa",
-            "temperature_600hPa", "relative_humidity_600hPa", "geopotential_height_600hPa",
-            "temperature_500hPa", "relative_humidity_500hPa", "geopotential_height_500hPa",
-            "temperature_400hPa", "relative_humidity_400hPa", "geopotential_height_400hPa",
-            "temperature_300hPa", "relative_humidity_300hPa", "geopotential_height_300hPa",
-            "temperature_250hPa", "relative_humidity_250hPa", "geopotential_height_250hPa",
-            "temperature_200hPa", "relative_humidity_200hPa", "geopotential_height_200hPa",
-            "temperature_150hPa", "relative_humidity_150hPa", "geopotential_height_150hPa",
-            "temperature_100hPa", "relative_humidity_100hPa", "geopotential_height_100hPa",
-            "temperature_70hPa", "relative_humidity_70hPa", "geopotential_height_70hPa",
-            "temperature_50hPa", "relative_humidity_50hPa", "geopotential_height_50hPa",
-            "temperature_30hPa", "relative_humidity_30hPa", "geopotential_height_30hPa",
-            "wind_speed_1000hPa", "wind_direction_1000hPa",
-            "wind_speed_975hPa", "wind_direction_975hPa",
-            "wind_speed_950hPa", "wind_direction_950hPa",
-            "wind_speed_925hPa", "wind_direction_925hPa",
-            "wind_speed_900hPa", "wind_direction_900hPa",
-            "wind_speed_850hPa", "wind_direction_850hPa",
-            "wind_speed_800hPa", "wind_direction_800hPa",
-            "wind_speed_700hPa", "wind_direction_700hPa",
-            "wind_speed_600hPa", "wind_direction_600hPa",
-            "wind_speed_500hPa", "wind_direction_500hPa",
-            "wind_speed_400hPa", "wind_direction_400hPa",
-            "wind_speed_300hPa", "wind_direction_300hPa",
-            "wind_speed_250hPa", "wind_direction_250hPa",
-            "wind_speed_200hPa", "wind_direction_200hPa",
-            "wind_speed_150hPa", "wind_direction_150hPa",
-            "wind_speed_100hPa", "wind_direction_100hPa",
-            "wind_speed_70hPa", "wind_direction_70hPa",
-            "wind_speed_50hPa", "wind_direction_50hPa",
-            "wind_direction_850hPa",
-            "wind_direction_30hPa"
+            "temperature_2m", "relative_humidity_2m", "dew_point_2m", "pressure_msl",
+            "temperature_500hPa", "temperature_700hPa", "temperature_850hPa",
+            "relative_humidity_500hPa", "relative_humidity_700hPa", "relative_humidity_850hPa",
+            "wind_speed_500hPa", "wind_direction_500hPa", "wind_direction_850hPa",
+            "wind_speed_10m", "wind_speed_80m", "wind_speed_120m", "wind_speed_180m",
+            "wind_direction_10m", "wind_direction_80m", "wind_direction_120m", "wind_direction_180m",
+            "temperature_80m", "temperature_120m", "temperature_180m",
+            "temperature_1000hPa", "temperature_975hPa", "temperature_950hPa", "temperature_925hPa",
+            "temperature_900hPa", "temperature_800hPa", "temperature_600hPa", "temperature_400hPa",
+            "temperature_300hPa", "temperature_250hPa", "temperature_200hPa", "temperature_150hPa",
+            "temperature_100hPa", "temperature_70hPa", "temperature_50hPa", "temperature_30hPa",
+            "relative_humidity_1000hPa", "relative_humidity_975hPa", "relative_humidity_950hPa",
+            "relative_humidity_925hPa", "relative_humidity_900hPa", "relative_humidity_800hPa",
+            "relative_humidity_600hPa", "relative_humidity_400hPa", "relative_humidity_300hPa",
+            "relative_humidity_250hPa", "relative_humidity_200hPa", "relative_humidity_150hPa",
+            "relative_humidity_100hPa", "relative_humidity_70hPa", "relative_humidity_50hPa",
+            "relative_humidity_30hPa",
+            "wind_speed_1000hPa", "wind_speed_975hPa", "wind_speed_950hPa", "wind_speed_925hPa",
+            "wind_speed_900hPa", "wind_speed_800hPa", "wind_speed_700hPa", "wind_speed_600hPa",
+            "wind_speed_400hPa", "wind_speed_300hPa", "wind_speed_250hPa", "wind_speed_200hPa",
+            "wind_speed_150hPa", "wind_speed_100hPa", "wind_speed_70hPa", "wind_speed_50hPa",
+            "wind_speed_30hPa", "wind_speed_850hPa", # wind_speed_850hPa was already in the list
+            "wind_direction_1000hPa", "wind_direction_975hPa", "wind_direction_950hPa",
+            "wind_direction_925hPa", "wind_direction_900hPa", "wind_direction_800hPa",
+            "wind_direction_700hPa", "wind_direction_600hPa", "wind_direction_400hPa",
+            "wind_direction_300hPa", "wind_direction_250hPa", "wind_direction_200hPa",
+            "wind_direction_150hPa", "wind_direction_100hPa", "wind_direction_70hPa",
+            "wind_direction_50hPa", "wind_direction_30hPa",
+            "geopotential_height_1000hPa", "geopotential_height_975hPa", "geopotential_height_950hPa",
+            "geopotential_height_925hPa", "geopotential_height_900hPa", "geopotential_height_850hPa",
+            "geopotential_height_800hPa", "geopotential_height_700hPa", "geopotential_height_600hPa",
+            "geopotential_height_500hPa", "geopotential_height_400hPa", "geopotential_height_300hPa",
+            "geopotential_height_250hPa", "geopotential_height_200hPa", "geopotential_height_150hPa",
+            "geopotential_height_100hPa", "geopotential_height_70hPa", "geopotential_height_50hPa",
+            "geopotential_height_30hPa",
+            "surface_pressure", "evapotranspiration", "et0_fao_evapotranspiration",
+            "vapour_pressure_deficit", "lifted_index", "cape", "convective_inhibition"
         ]
+        
         params = {
             "latitude": latitude,
             "longitude": longitude,
-            "hourly": ",".join(hourly_variables),
+            "hourly": ",".join(hourly_variables), # Tüm hourly değişkenleri API isteğine ekleniyor
             "timezone": "auto",
             "forecast_days": 1,
         }
@@ -107,13 +104,18 @@ def create_profiles(hourly_row):
     API'den gelen verileri kullanarak tüm profilleri oluşturur.
     """
     pressure_levels_hpa = np.array([1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30])
-    p_profile_data = pressure_levels_hpa
+    
+    # Sıcaklık, bağıl nem, rüzgar hızı ve yönü verilerini toplama
     t_profile_data = np.array([hourly_row.get(f'temperature_{p}hPa') for p in pressure_levels_hpa])
     rh_profile_data = np.array([hourly_row.get(f'relative_humidity_{p}hPa') for p in pressure_levels_hpa])
     wind_speed_data = np.array([hourly_row.get(f'wind_speed_{p}hPa') for p in pressure_levels_hpa])
     wind_direction_data = np.array([hourly_row.get(f'wind_direction_{p}hPa') for p in pressure_levels_hpa])
-    valid_indices = ~np.isnan(t_profile_data) & ~np.isnan(rh_profile_data) & ~np.isnan(p_profile_data)
-    p_profile = p_profile_data[valid_indices].astype(np.float64) * units.hPa
+    
+    # Geçerli (NaN olmayan) indeksleri bulma
+    valid_indices = ~np.isnan(t_profile_data) & ~np.isnan(rh_profile_data) & ~np.isnan(pressure_levels_hpa)
+    
+    # Birimlere dönüştürme
+    p_profile = pressure_levels_hpa[valid_indices].astype(np.float64) * units.hPa
     temp_profile = t_profile_data[valid_indices].astype(np.float64) * units.degC
     rh_profile = rh_profile_data[valid_indices].astype(np.float64) * units.percent
     wind_speed = wind_speed_data[valid_indices].astype(np.float64) * units.km / units.hour
